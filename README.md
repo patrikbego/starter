@@ -18,7 +18,7 @@ starter/                          # single git repository
 | `starter-backend/` | Spring Boot API on Cloud Run (Firebase, Firestore, Spring AI) |
 | `starter-mobile/` | Expo SDK 54 client (Firebase Auth, typed REST client) |
 
-One repository, one `git push` — CI/CD workflows (when implemented) use path filters to deploy backend and mobile independently.
+One repository, one `git push` — CI/CD workflows use path filters to deploy backend and mobile independently.
 
 ## Minimal integration surface
 
@@ -50,4 +50,6 @@ See [docs/README.md](./docs/README.md).
 
 ## Status
 
-**Docs phase** — architecture and setup guides are complete; application code, Dockerfiles, and CI workflows will follow in a later phase.
+**Backend MVP implemented** — Spring Boot API with auth, `/api/me`, `/api/chat`, Docker, and GitHub Actions CI/CD in `starter-backend/`.
+
+**Mobile** — docs phase; Expo app code will follow.
