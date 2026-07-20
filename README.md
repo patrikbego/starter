@@ -34,8 +34,9 @@ Product-specific logic is added **after** forking — see [docs/NEW_APP_WORKFLOW
 ## Quick start
 
 1. Read [docs/ARCHITECTURE_OVERVIEW.md](./docs/ARCHITECTURE_OVERVIEW.md) for the full stack.
-2. Follow [docs/NEW_APP_WORKFLOW.md](./docs/NEW_APP_WORKFLOW.md) to fork this monorepo into a new product.
-3. Use [docs/ENVIRONMENT_MATRIX.md](./docs/ENVIRONMENT_MATRIX.md) when configuring DEV/PROD.
+2. **Run the apps:** [starter-backend/run/README.md](./starter-backend/run/README.md) and [starter-mobile/run/README.md](./starter-mobile/run/README.md)
+3. Follow [docs/NEW_APP_WORKFLOW.md](./docs/NEW_APP_WORKFLOW.md) to fork this monorepo into a new product.
+4. Use [docs/ENVIRONMENT_MATRIX.md](./docs/ENVIRONMENT_MATRIX.md) when configuring DEV/PROD.
 
 ## Deployment model
 
