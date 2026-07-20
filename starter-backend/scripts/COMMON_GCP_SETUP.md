@@ -1,165 +1,87 @@
-# Common GCP Infrastructure Setup Guide
+# Google Cloud Resource Blueprint
 
-Shared infrastructure setup for `starter-dev` and `starter-prod` environments.
+This is the target resource and IAM blueprint for each product. Implement it with versioned OpenTofu/Terraform (or an equivalently idempotent tool) before template v1. Manual console/CLI setup is useful for exploration but does not scale reliably across many apps.
 
-Replace `[PROJECT_ID]` with `starter-dev` or `starter-prod`.
+## Required APIs/resources
 
-## 1. Enable Required GCP APIs
+| Resource | Purpose |
+|---|---|
+| Cloud Run | Backend runtime |
+| Firestore | Starter user record and product data |
+| Secret Manager | Runtime provider/admin secrets |
+| Artifact Registry | Immutable container artifacts |
+| IAM Credentials / WIF | Short-lived GitHub deployment identity |
+| Cloud Logging/Monitoring | Logs, metrics, alerts |
 
-```bash
-gcloud config set project [PROJECT_ID]
+Firebase Authentication is linked to the environment's GCP project. Cloud Storage/Tasks/Document AI are extensions and remain disabled until a product needs them.
 
-gcloud services enable firestore.googleapis.com
-gcloud services enable run.googleapis.com
-gcloud services enable artifactregistry.googleapis.com
-gcloud services enable secretmanager.googleapis.com
-gcloud services enable iamcredentials.googleapis.com
-gcloud services enable cloudbuild.googleapis.com
+## Resource ownership
+
+Use separate `{app}-dev` and `{app}-prod` runtime/data projects. Select Firestore/data region before provisioning. For immutable backend promotion, use a release Artifact Registry that both environments can read at repository scope, or copy the tested digest without rebuilding and verify digest equality.
+
+## Identities
+
+| Identity | Permissions |
+|---|---|
+| Runtime API | Firestore data access required by app; access to named runtime secrets; extension permissions only when used |
+| Image publisher | Push image/attestations to release repository |
+| DEV deployer | Deploy DEV service; act as DEV runtime identity; read release image |
+| PROD deployer | Deploy PROD service after approval; act as PROD runtime identity; read release image |
+| Cloud Run service agent | Read the chosen image repository, including cross-project grant when needed |
+
+Do not grant Artifact Registry writer to the runtime identity. Do not grant project-wide Owner/Editor. Avoid broad `run.admin` or project-wide `iam.serviceAccountUser` when narrower service/account permissions meet the need.
+
+## GitHub OIDC/WIF
+
+- Trust only `https://token.actions.githubusercontent.com`.
+- Map repository identity and apply an attribute condition for the exact owner/repository.
+- Restrict DEV/PROD by protected branch/environment claims as supported.
+- Grant `roles/iam.workloadIdentityUser` only to the intended principal set.
+- Use separate deploy service accounts for DEV and PROD.
+- Store provider/service-account identifiers as configuration; store no JSON key.
+
+GitHub's current guidance is linked from [the CI/CD document](../docs/cicd_deployment_plan.md).
+
+## Secrets
+
+Create separate environment values for:
+
+- AI provider key;
+- actuator/operations credential only if retained;
+- future integration secrets.
+
+Grant runtime access to individual secrets where practical. Define rotation owner and verify a new version before disabling the old one.
+
+## Firestore
+
+- Native mode and deliberately selected location
+- environment-specific database/project
+- indexes declared/versioned with the product
+- deletion protection/backup/export policy appropriate to PROD
+- runtime access only; mobile does not directly access starter server-owned collections unless a product explicitly designs Firebase rules for it
+
+## Required outputs
+
+Infrastructure automation should output:
+
+```text
+project ID
+region
+Cloud Run service name/URL
+runtime service account
+Artifact Registry image path
+WIF provider and deploy service account identifiers
+Firebase project ID
 ```
 
-For file upload extension, also enable:
+Do not output secret values.
 
-```bash
-gcloud services enable storage.googleapis.com
-```
+## Validation
 
-## 2. Create Firestore Database
-
-Native mode, Europe:
-
-```bash
-gcloud firestore databases create \
-  --project=[PROJECT_ID] \
-  --location=eur3 \
-  --type=firestore-native
-```
-
-Add `--delete-protection` for PROD.
-
-Or via Console: https://console.cloud.google.com/datastore/setup?project=[PROJECT_ID]
-
-## 3. Create Service Account
-
-```bash
-gcloud iam service-accounts create starter-api \
-  --display-name="Starter API Service Account" \
-  --project=[PROJECT_ID]
-
-# Firestore
-gcloud projects add-iam-policy-binding [PROJECT_ID] \
-  --member="serviceAccount:starter-api@[PROJECT_ID].iam.gserviceaccount.com" \
-  --role="roles/datastore.user"
-
-# Secret Manager
-gcloud projects add-iam-policy-binding [PROJECT_ID] \
-  --member="serviceAccount:starter-api@[PROJECT_ID].iam.gserviceaccount.com" \
-  --role="roles/secretmanager.secretAccessor"
-
-# Cloud Run runtime (service account used by Cloud Run service)
-gcloud iam service-accounts add-iam-policy-binding starter-api@[PROJECT_ID].iam.gserviceaccount.com \
-  --project=[PROJECT_ID] \
-  --member="serviceAccount:starter-api@[PROJECT_ID].iam.gserviceaccount.com" \
-  --role="roles/iam.serviceAccountUser"
-```
-
-For GCS extension, add `roles/storage.objectAdmin` and `roles/iam.serviceAccountTokenCreator`.
-
-## 4. Create Artifact Registry
-
-```bash
-gcloud artifacts repositories create starter-api \
-  --repository-format=docker \
-  --location=europe-west2 \
-  --project=[PROJECT_ID]
-
-gcloud projects add-iam-policy-binding [PROJECT_ID] \
-  --member="serviceAccount:starter-api@[PROJECT_ID].iam.gserviceaccount.com" \
-  --role="roles/artifactregistry.writer"
-```
-
-## 5. Create Secrets
-
-```bash
-echo -n "sk-or-v1-YOUR_OPENROUTER_KEY" | gcloud secrets create openai-api-key --data-file=-
-echo -n "your-secure-actuator-password" | gcloud secrets create actuator-password --data-file=-
-
-# Grant Cloud Run SA access
-gcloud secrets add-iam-policy-binding openai-api-key \
-  --member="serviceAccount:starter-api@[PROJECT_ID].iam.gserviceaccount.com" \
-  --role="roles/secretmanager.secretAccessor" \
-  --project=[PROJECT_ID]
-
-gcloud secrets add-iam-policy-binding actuator-password \
-  --member="serviceAccount:starter-api@[PROJECT_ID].iam.gserviceaccount.com" \
-  --role="roles/secretmanager.secretAccessor" \
-  --project=[PROJECT_ID]
-```
-
-## 6. Workload Identity Federation (GitHub Actions)
-
-Create a pool and provider for GitHub OIDC so CI can deploy without long-lived keys.
-
-```bash
-# Create pool
-gcloud iam workload-identity-pools create github-pool \
-  --location=global \
-  --project=[PROJECT_ID]
-
-# Create provider (replace GITHUB_ORG and GITHUB_REPO)
-gcloud iam workload-identity-pools providers create-oidc github-provider \
-  --location=global \
-  --workload-identity-pool=github-pool \
-  --issuer-uri=https://token.actions.githubusercontent.com \
-  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
-  --attribute-condition="assertion.repository=='GITHUB_ORG/starter-backend'" \
-  --project=[PROJECT_ID]
-
-# Create CI service account
-gcloud iam service-accounts create github-actions \
-  --display-name="GitHub Actions" \
-  --project=[PROJECT_ID]
-
-# Allow GitHub repo to impersonate SA
-gcloud iam service-accounts add-iam-policy-binding github-actions@[PROJECT_ID].iam.gserviceaccount.com \
-  --project=[PROJECT_ID] \
-  --role="roles/iam.workloadIdentityUser" \
-  --member="principalSet://iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/attribute.repository/GITHUB_ORG/starter-backend"
-
-# Grant deploy permissions
-gcloud projects add-iam-policy-binding [PROJECT_ID] \
-  --member="serviceAccount:github-actions@[PROJECT_ID].iam.gserviceaccount.com" \
-  --role="roles/run.admin"
-
-gcloud projects add-iam-policy-binding [PROJECT_ID] \
-  --member="serviceAccount:github-actions@[PROJECT_ID].iam.gserviceaccount.com" \
-  --role="roles/artifactregistry.writer"
-
-gcloud projects add-iam-policy-binding [PROJECT_ID] \
-  --member="serviceAccount:github-actions@[PROJECT_ID].iam.gserviceaccount.com" \
-  --role="roles/iam.serviceAccountUser"
-```
-
-Record `WIF_PROVIDER` and `WIF_SERVICE_ACCOUNT` for GitHub secrets.
-
-## 7. Link Firebase
-
-1. Firebase Console → Add project → select existing GCP project `[PROJECT_ID]`
-2. Enable Authentication → Email/Password
-3. Download client config for mobile apps
-
-## 8. Optional: Cloud Storage Bucket
-
-Only if implementing `STORAGE_EXTENSION.md`:
-
-```bash
-gsutil mb -p [PROJECT_ID] -c standard -l EU gs://[PROJECT_ID]-documents/
-gsutil uniformbucketlevelaccess set on gs://[PROJECT_ID]-documents/
-gsutil pap set enforced gs://[PROJECT_ID]-documents/
-```
-
-## Related docs
-
-- [DEV_SETUP.md](./DEV_SETUP.md)
-- [PROD_SETUP.md](./PROD_SETUP.md)
-- [DEV_LOCAL_SETUP.md](./DEV_LOCAL_SETUP.md)
-- [../docs/cicd_deployment_plan.md](../docs/cicd_deployment_plan.md)
+- [ ] Second apply is idempotent
+- [ ] DEV/PROD plans show no cross-environment data access
+- [ ] CI can authenticate without a key
+- [ ] Runtime can read only required data/secrets
+- [ ] PROD can deploy the tested digest from the release repository
+- [ ] Budget/alert ownership is configured
+- [ ] Destroy behavior protects production state/data

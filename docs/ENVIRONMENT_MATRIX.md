@@ -1,105 +1,115 @@
 # Environment Matrix
 
-DEV/PROD variable mapping across backend, mobile, GCP, Firebase, and CI. Replace `starter` with your app slug (`{app}`) when forking.
+Replace `{app}` with a stable lowercase slug. DEV and PROD are isolated projects and Firebase tenants; never mix their tokens, URLs, data, or credentials.
 
-## GCP projects
+## Environment intent
 
-| | DEV | PROD |
-|---|-----|------|
-| GCP project ID | `starter-dev` | `starter-prod` |
-| Firebase project | Same as GCP project | Same as GCP project |
-| Cloud Run service | `starter-api-dev` | `starter-api-prod` |
-| Artifact Registry repo | `europe-west2-docker.pkg.dev/starter-dev/starter-api` | `europe-west2-docker.pkg.dev/starter-prod/starter-api` |
-| Firestore database | Native mode, `eur3` | Native mode, `eur3` |
-| Service account | `starter-api@starter-dev.iam.gserviceaccount.com` | `starter-api@starter-prod.iam.gserviceaccount.com` |
-| Region | `europe-west2` | `europe-west2` |
+| Environment | Backend execution | Mobile execution | Data | Purpose |
+|---|---|---|---|---|
+| `local` | Explicit local profile with mocks/emulators | Expo local development | Disposable | Fast offline feedback |
+| `dev-local` | Local JVM with real DEV adapters | Expo local or preview app | DEV | Debug real integrations |
+| `dev` | Cloud Run in `{app}-dev` | EAS preview/internal build | DEV | Shared integration and QA |
+| `prod` | Cloud Run in `{app}-prod` | Store-signed build | PROD | Real users |
 
-## Backend environment variables
+The backend has no implicit local fallback. The mobile production build has no fallback API URL. Missing required configuration stops startup/build.
 
-### Cloud Run (dev / prod profiles)
+## Cloud resources
 
-| Variable | DEV example | PROD example | Source |
-|----------|-------------|--------------|--------|
-| `SPRING_PROFILES_ACTIVE` | `dev` | `prod` | Cloud Run env |
-| `GCP_PROJECT_ID` | `starter-dev` | `starter-prod` | Cloud Run env |
-| `STARTER_CORS_ALLOWED_ORIGINS` | `*` | `https://yourdomain.com` | Cloud Run env |
-| `OPENAI_API_KEY` | — | — | Secret Manager → `openai-api-key` |
-| `ACTUATOR_PASSWORD` | — | — | Secret Manager → `actuator-password` |
+| Resource | DEV | PROD |
+|---|---|---|
+| GCP project | `{app}-dev` | `{app}-prod` |
+| Firebase project | `{app}-dev` | `{app}-prod` |
+| Cloud Run service | `{app}-api-dev` | `{app}-api-prod` |
+| Firestore | Native mode, selected region | Native mode, same data-residency policy |
+| Runtime service account | `{app}-api@{app}-dev.iam.gserviceaccount.com` | `{app}-api@{app}-prod.iam.gserviceaccount.com` |
+| Secrets | DEV values only | PROD values only |
 
-### Local development (dev-local profile)
+For strict “build once, promote” semantics, store images in a shared Artifact Registry project/repository or grant the PROD deployer and Cloud Run service agent read access to the repository that contains the tested digest. Deploy by `image@sha256:...`, never a mutable tag.
 
-| Variable | Required | Example |
-|----------|----------|---------|
-| `GOOGLE_APPLICATION_CREDENTIALS` | Yes | `~/.gcp/starter-dev-sa.json` |
-| `GCP_PROJECT_ID` | No (defaults to `starter-dev`) | `starter-dev` |
-| `FIREBASE_AUTH_EMULATOR_HOST` | No | `localhost:9099` |
-| `OPENAI_API_KEY` | Yes | OpenRouter key (`sk-or-v1-...`) |
+## Backend variables
 
-### Local development (local profile)
+### Required in `dev` and `prod`
 
-| Variable | Required | Default |
-|----------|----------|---------|
-| `FIRESTORE_EMULATOR_HOST` | No | `localhost:8080` |
-| `FIREBASE_AUTH_EMULATOR_HOST` | No | `localhost:9099` |
-| `LOCAL_AI_URL` | No | `http://localhost:8081/v1` |
+| Variable | Example | Source |
+|---|---|---|
+| `SPRING_PROFILES_ACTIVE` | `dev` or `prod` | Cloud Run environment |
+| `GCP_PROJECT_ID` | `{app}-dev` | Cloud Run environment |
+| `{APP}_CORS_ALLOWED_ORIGINS` | `https://admin.example.com` | Cloud Run environment |
+| `OPENAI_API_KEY` | secret value | Secret Manager |
+| `AI_MODEL` | provider model identifier | Environment/managed config |
+| `ACTUATOR_PASSWORD` | secret value | Secret Manager, only if Basic-auth actuator is retained |
 
-## Mobile environment variables
+Recommended operational variables:
 
-Set via EAS build profile `env` block or `app.config.ts` at build time.
+| Variable | Purpose |
+|---|---|
+| `AI_REQUEST_TIMEOUT` | Bound provider latency |
+| `AI_MAX_REQUESTS_PER_USER` | Per-user cost/abuse limit |
+| `AI_MAX_INPUT_CHARS` | Input cap enforced before provider call |
+| `LOG_FORMAT` | Human local logs versus structured cloud logs |
 
-| Variable | DEV (`APP_ENV=development`) | PROD (`APP_ENV=production`) |
-|----------|----------------------------|----------------------------|
+### `dev-local`
+
+| Variable | Required | Notes |
+|---|---|---|
+| `SPRING_PROFILES_ACTIVE=dev-local` | Yes | Must be explicit |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Usually | Local ADC file outside the repo, or `gcloud auth application-default login` |
+| `GCP_PROJECT_ID={app}-dev` | Yes | Guard against accidental PROD access |
+| `OPENAI_API_KEY` | Yes for real AI | Use DEV/provider-limited key |
+
+### `local`
+
+| Variable | Required | Default/notes |
+|---|---|---|
+| `SPRING_PROFILES_ACTIVE=local` | Yes | Explicit opt-in to mocks |
+| `FIRESTORE_EMULATOR_HOST` | No | Only when using the emulator instead of the in-memory port |
+| `FIREBASE_AUTH_EMULATOR_HOST` | No | Only when testing real emulator-issued tokens |
+
+## Mobile build variables
+
+Use EAS environments so the same public variable names resolve to environment-specific values. Firebase web configuration is public app configuration, not a server secret, but it must still match the intended Firebase project.
+
+| Variable | DEV preview | PROD store build |
+|---|---|---|
 | `APP_ENV` | `development` | `production` |
-| `API_BASE_URL_DEV` | `https://starter-api-dev-XXXX.europe-west2.run.app` | — |
-| `API_BASE_URL_PROD` | — | `https://starter-api-prod-XXXX.europe-west2.run.app` |
-| `EXPO_PUBLIC_FIREBASE_API_KEY` | DEV Firebase web API key | PROD Firebase web API key |
-| `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN` | `starter-dev.firebaseapp.com` | `starter-prod.firebaseapp.com` |
-| `EXPO_PUBLIC_FIREBASE_PROJECT_ID` | `starter-dev` | `starter-prod` |
+| `EXPO_PUBLIC_API_BASE_URL` | DEV Cloud Run URL | PROD API URL |
+| `EXPO_PUBLIC_FIREBASE_API_KEY` | DEV Firebase value | PROD Firebase value |
+| `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN` | DEV domain | PROD domain |
+| `EXPO_PUBLIC_FIREBASE_PROJECT_ID` | `{app}-dev` | `{app}-prod` |
+| `EAS_PROJECT_ID` | Product EAS project | Same product EAS project |
 
-Runtime access: `Constants.expoConfig?.extra` (after `app.config.ts` is implemented).
+Target behavior:
 
-## CI/CD secrets
+- Local development may default to `http://localhost:8080` only when `APP_ENV=development` and a deliberate local flag is set.
+- Preview builds must require a DEV HTTPS API URL.
+- Production builds must require a PROD HTTPS URL and reject `localhost`, DEV project IDs, or empty values.
+- API URL and Firebase project pairing is validated in `app.config.ts` before a build starts.
 
-### GitHub Actions — backend repo
+## CI/CD identities and secrets
 
-| Secret | Used by | Description |
-|--------|---------|-------------|
-| `WIF_PROVIDER` | deploy workflows | Workload Identity Federation provider |
-| `WIF_SERVICE_ACCOUNT` | deploy workflows | GCP SA for CI deploy |
-| `GCP_PROJECT_ID` | deploy-dev | `starter-dev` or `starter-prod` |
+### Backend repository
 
-### GitHub Actions — mobile repo
+| Name | Scope | Purpose |
+|---|---|---|
+| `GCP_WORKLOAD_IDENTITY_PROVIDER_DEV` | DEV environment/repository | Short-lived GitHub OIDC authentication |
+| `GCP_SERVICE_ACCOUNT_DEV` | DEV environment/repository | Build/deploy DEV |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER_PROD` | Protected PROD environment | Short-lived production authentication |
+| `GCP_SERVICE_ACCOUNT_PROD` | Protected PROD environment | Deploy approved digest only |
 
-| Secret | Used by | Description |
-|--------|---------|-------------|
-| `EXPO_TOKEN` | EAS build/submit | Expo account token |
+Prefer GitHub environment variables for project IDs, region, and service names; they are configuration, not secrets. Restrict OIDC trust to the exact repository and protected branch/environment.
 
-### GCP Secret Manager (per project)
+### Mobile repository
 
-| Secret name | Used by | Description |
-|-------------|---------|-------------|
-| `openai-api-key` | Cloud Run | OpenRouter API key |
-| `actuator-password` | Cloud Run | Admin actuator HTTP Basic password |
+| Name | Scope | Purpose |
+|---|---|---|
+| `EXPO_TOKEN` | Repository or environment secret | EAS CLI authentication |
+| Store credentials | EAS-managed / protected environment | App Store Connect and Play submission |
 
-## EAS build profiles (planned)
+## Pairing guardrails
 
-| Profile | `APP_ENV` | API URL var | Distribution |
-|---------|-----------|-------------|--------------|
-| `development` | `development` | `API_BASE_URL_DEV` | Internal dev client |
-| `preview` | `development` | `API_BASE_URL_DEV` | Internal QA |
-| `production` | `production` | `API_BASE_URL_PROD` | Store submit |
-
-## Pairing checklist
-
-Before testing end-to-end, confirm:
-
-- [ ] Mobile `APP_ENV=development` points to DEV Cloud Run URL
-- [ ] Mobile Firebase config matches `starter-dev` Firebase project
-- [ ] Backend `dev` profile uses same Firebase project as mobile DEV build
-- [ ] PROD mobile build uses PROD API URL and PROD Firebase — never cross-wired
-
-## Related docs
-
-- [NEW_APP_WORKFLOW.md](./NEW_APP_WORKFLOW.md) — setup steps
-- [starter-backend/scripts/INTEGRATION_ENV_CONFIG.md](../starter-backend/scripts/INTEGRATION_ENV_CONFIG.md) — full backend env reference
-- [starter-mobile/docs/BACKEND_INTEGRATION.md](../starter-mobile/docs/BACKEND_INTEGRATION.md) — mobile API client config
+- [ ] DEV mobile project ID equals DEV backend Firebase project ID
+- [ ] PROD mobile project ID equals PROD backend Firebase project ID
+- [ ] PROD builds contain no DEV host/project identifiers
+- [ ] Backend service accounts cannot read the other environment's Firestore or secrets
+- [ ] Production workflow receives an immutable backend digest, not source to rebuild
+- [ ] Store release-candidate build uses production configuration and is tested through store-managed testing

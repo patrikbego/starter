@@ -1,106 +1,87 @@
-# Mobile MVP Scope Checklist
+# Mobile Template v1 Scope
 
-Minimal screens and integrations for the starter mobile app.
+The prototype implements the visible starter loop. Template v1 is not complete until the repository, contract, persistence, tests, and release flow meet the criteria below.
 
-**Status:** MVP implemented.
+## Prototype evidence
 
----
+| Capability | Current status |
+|---|---|
+| Expo Router app and TypeScript | Implemented |
+| Login/sign-up/sign-out UI | Implemented |
+| Auth gate/provider | Implemented; durable native persistence needs verification |
+| Bearer-token API adapter and one 401 retry | Implemented |
+| TanStack Query provider, `/me`, health | Implemented |
+| Minimal chat screen | Implemented |
+| `app.config.ts` and `eas.json` | Present; target validation/release model pending |
+| TypeScript check | Passing on 2026-07-20 |
+| Direct ESLint | Passing with `eslint . --no-cache` under matching Node architecture |
+| `npm run lint` / `expo lint` | Fails on the current dual-architecture local setup because `unrs-resolver` native binding loading is inconsistent; toolchain pin/fix required |
+| Parent-workspace GitHub workflows | Present, not independent-repository ready |
 
-## 1. Screens
+## Required before template v1
 
-### 1.1 Login (`app/(auth)/login.tsx`)
+### Repository and contract
 
-| Criterion | Status |
-|-----------|--------|
-| Email/password sign-in via Firebase | Implemented |
-| Show error on invalid credentials | Implemented |
-| Navigate to tabs on success | Implemented |
-| Link to sign-up (optional MVP) | Implemented |
+- [ ] Independent mobile Git repository with repository-owned workflows
+- [ ] Pinned backend OpenAPI contract/version
+- [ ] Generated or contract-validated API types/fixtures
+- [ ] Client paths moved to `/api/v1`
+- [ ] Standard backend error decoding and correlation ID support
 
-### 1.2 Home (`app/(tabs)/index.tsx`)
+### Authentication and data safety
 
-| Criterion | Status |
-|-----------|--------|
-| Display user email/name from `GET /api/me` | Implemented |
-| Show loading state while fetching | Implemented |
-| Backend health badge from `GET /actuator/health` | Implemented |
-| Pull-to-refresh refetches me + health | Implemented |
-| Sign out button | Implemented |
+- [ ] Durable Firebase auth persistence configured for the pinned React Native stack
+- [ ] Stable loading gate while session restores
+- [ ] Concurrent `401`s share one refresh; retry occurs once
+- [ ] Protected query data clears when the user changes/signs out
+- [ ] No tokens, prompts, or sensitive payloads in logs/analytics
 
-### 1.3 Chat (`app/(tabs)/chat.tsx`)
+### Configuration
 
-| Criterion | Status |
-|-----------|--------|
-| Text input for message | Implemented |
-| Send calls `POST /api/chat` | Implemented |
-| Display AI reply | Implemented |
-| Show loading while waiting | Implemented |
-| Show error on failure | Implemented |
-| Maintain `sessionId` across messages (optional MVP) | Implemented |
+- [ ] One validated API URL variable per EAS environment
+- [ ] Production build rejects DEV/localhost/missing values
+- [ ] Preview build rejects PROD Firebase/API mismatch
+- [ ] DEV and PROD app identifiers/variants documented
+- [ ] No server secrets use `EXPO_PUBLIC_*`
 
-### 1.4 Auth gate (`app/_layout.tsx`)
+### UX and tests
 
-| Criterion | Status |
-|-----------|--------|
-| Unauthenticated users see only `(auth)` routes | Implemented |
-| Authenticated users see `(tabs)` | Implemented |
-| Session restored on app launch | Implemented |
+- [ ] Unit/component tests for auth gate, API adapter, `/me`, and AI errors
+- [ ] Clean `npm ci`, lint, typecheck, tests, and Expo Doctor in CI
+- [ ] Loading, empty, offline, timeout, rate-limit, and retry states
+- [ ] Accessibility, safe-area, keyboard, dynamic-text, and contrast checks
+- [ ] Real-device DEV smoke flow passes
 
----
+### Delivery
 
-## 2. Infrastructure
+- [ ] DEV preview workflow uses internal distribution and DEV config
+- [ ] Production workflow produces store artifacts with PROD config
+- [ ] Submission reuses recorded production build IDs without rebuilding
+- [ ] TestFlight/Play internal testing precedes public release
+- [ ] Runtime-version/update-channel strategy documented if EAS Update enabled
+- [ ] Store and OTA rollback drills completed
 
-| Item | Status |
-|------|--------|
-| Expo SDK 54 project | Implemented |
-| TypeScript strict | Implemented |
-| `app.config.ts` with `apiBaseUrl` | Implemented |
-| Firebase Auth adapter | Implemented |
-| HttpApiClient with Bearer injection | Implemented |
-| TanStack Query provider | Implemented |
-| `eas.json` | Implemented |
-| GitHub Actions `ci-mobile.yml` | Implemented |
-| GitHub Actions `eas-build-dev.yml` | Implemented |
+## Explicit non-goals
 
----
+- Product branding system beyond replaceable placeholders
+- Camera/file upload
+- Payments/subscriptions
+- Push notifications
+- Analytics vendor
+- Offline-first sync
+- Persisted conversations/RAG UI
+- Admin or tablet-specific product experiences
 
-## 3. Explicitly out of scope (starter MVP)
+## End-to-end acceptance test
 
-| Feature | Notes |
-|---------|-------|
-| RevenueCat / paywall | Extension |
-| File upload / camera | Extension — backend `STORAGE_EXTENSION.md` |
-| Search / RAG UI beyond simple chat | Extension |
-| Offline mode | Post-MVP |
-| Biometric lock | Post-MVP |
-| Push notifications | Post-MVP |
+From a clean clone:
 
----
-
-## 4. End-to-end test flow
-
-1. Install DEV build (EAS internal)
-2. Sign in with Firebase (DEV project)
-3. Home shows user profile from `/api/me`
-4. Health badge shows green when backend reachable
-5. Chat sends "hello" → receives AI reply
-6. Sign out → returns to login
-
----
-
-## 5. Backend coordination
-
-Align with [starter-backend/docs/MVP_SCOPE_CHECKLIST.md](../starter-backend/docs/MVP_SCOPE_CHECKLIST.md):
-
-- [ ] DEV mobile uses DEV API URL
-- [ ] DEV mobile uses DEV Firebase project
-- [ ] Bearer token accepted by backend
-- [ ] Chat works against DEV OpenRouter key
-
----
-
-## Related docs
-
-- [mobile_architecture_plan.md](./mobile_architecture_plan.md)
-- [BACKEND_INTEGRATION.md](./BACKEND_INTEGRATION.md)
-- [mobile_ui_integration_plan.md](./mobile_ui_integration_plan.md)
+1. CI passes with a clean dependency install.
+2. Preview build validates DEV API/Firebase pairing.
+3. App restores a DEV Firebase session without route flicker.
+4. `/api/v1/me` displays the authenticated profile.
+5. AI request returns a stateless reply and handles limit/provider failures.
+6. Invalid token causes one refresh/retry, then sign-out if still invalid.
+7. Sign-out clears protected server-state cache.
+8. Production candidate contains only PROD configuration.
+9. The same store candidate tested internally is released without rebuilding.

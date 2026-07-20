@@ -1,299 +1,180 @@
-# Starter CI/CD and Deployment Plan
+# Backend CI/CD and Deployment
 
-## 1. Goal
+## Goal
 
-This document defines a simple, practical CI/CD plan for the starter backend.
+Every production revision is an approved promotion of the exact immutable container digest that passed CI and DEV smoke tests. GitHub authenticates to Google Cloud with short-lived OIDC credentials; no service-account JSON key is stored in GitHub.
 
-The initial deployment strategy is:
+This document describes the target independent backend repository. The parent-workspace workflows are prototype-only.
 
-```text
-Developer pushes code
-   -> automatic deployment to DEV
-   -> test and validate in DEV
-   -> manually promote the same build to PROD
+## Pipeline
+
+```mermaid
+flowchart LR
+  PR["Pull request"] --> Verify["mvn verify + contract + scans"]
+  Verify --> Merge["Merge to main"]
+  Merge --> Build["Build container once"]
+  Build --> Digest["Push and record sha256 digest"]
+  Digest --> Dev["Deploy digest to DEV"]
+  Dev --> Smoke["DEV smoke/contract checks"]
+  Smoke --> Approval["Protected production approval"]
+  Approval --> Prod["Deploy same digest to PROD"]
+  Prod --> ProdSmoke["PROD smoke check"]
 ```
 
-The goal is to keep deployment simple, fast, and cheap during early development while following good production practices.
-
-### Architecture assumptions
-
-- Spring Boot backend
-- Docker container images
-- Google Cloud Run
-- Google Artifact Registry
-- Firestore
-- Firebase Authentication
-- Spring AI + OpenRouter (`openai-api-key` secret)
-- GitHub Actions
-- **Expo mobile app** ([starter-mobile](../starter-mobile/)) — EAS Build/Submit; tested against DEV API before PROD promote
-- Terraform / OpenTofu (optional; not in repo)
-
-### 1.1 Implementation Status
-
-| Item | Status |
-|------|--------|
-| Documentation | Complete |
-| GitHub Actions `deploy-dev-backend.yml` on push to `main` | Implemented |
-| Manual `deploy-prod-backend.yml` | Implemented |
-| Single Cloud Run service per env (`starter-api-dev` / `starter-api-prod`) | Implemented |
-| Workload Identity Federation for GitHub | Documented (setup in COMMON_GCP_SETUP) |
-| Terraform/OpenTofu in repo | Not planned for MVP |
-
----
-
-## 2. Environment Strategy
-
-Two environments:
-
-```text
-DEV
-PROD
-```
-
-### DEV Environment
-
-Purpose:
-
-- Fast testing and feature validation
-- Mobile app integration testing (auth, `/api/me`, chat)
-- AI integration testing
-
-Characteristics:
-
-- Automatically deployed from `main` branch
-- Uses `starter-dev` GCP project and Firebase project
-- Lower rate limits and quotas
-- CORS may allow `*` for development
-- Can contain test data
-
-### PROD Environment
-
-Purpose:
-
-- Real users
-- Stable releases only
-
-Characteristics:
-
-- Manually promoted after DEV validation
-- Uses `starter-prod` GCP project and Firebase project
-- Stricter CORS (specific origins)
-- Protected secrets
-- Higher Cloud Run limits (CPU, memory, max instances)
-
----
-
-## 3. Branching Strategy
-
-```text
-main
-feature/*
-```
-
-Flow:
-
-```text
-feature branch
-   -> pull request
-   -> merge to main
-   -> automatic DEV deployment
-   -> test in DEV (API + mobile)
-   -> manually trigger PROD deployment
-```
-
-Use `main` + feature branches only for MVP simplicity.
-
----
-
-## 4. Deployment Principle: Build Once, Promote Same Image
-
-The same Docker image tag (git commit SHA) tested in DEV is deployed to PROD.
-
-```text
-git push main (commit abc123)
-   -> build image tagged abc123
-   -> deploy abc123 to Cloud Run DEV
-   -> validate
-   -> deploy abc123 to Cloud Run PROD (manual workflow)
-```
-
-Do not rebuild for PROD unless DEV failed and was fixed on a new commit.
-
----
-
-## 5. Cloud Run Configuration
-
-### DEV (`starter-api-dev`)
-
-| Setting | Value |
-|---------|-------|
-| Region | `europe-west2` |
-| CPU | 1 |
-| Memory | 1Gi |
-| Min instances | 0 |
-| Max instances | 5 |
-| Concurrency | 80 |
-| `--allow-unauthenticated` | Yes (auth at app layer) |
-| Service account | `starter-api@starter-dev.iam.gserviceaccount.com` |
-
-### PROD (`starter-api-prod`)
-
-| Setting | Value |
-|---------|-------|
-| Region | `europe-west2` |
-| CPU | 2 |
-| Memory | 2Gi |
-| Min instances | 0 |
-| Max instances | 20 |
-| Concurrency | 80 |
-| `--allow-unauthenticated` | Yes |
-| Service account | `starter-api@starter-prod.iam.gserviceaccount.com` |
-
-### Environment variables (Cloud Run)
-
-| Variable | DEV | PROD |
-|----------|-----|------|
-| `SPRING_PROFILES_ACTIVE` | `dev` | `prod` |
-| `GCP_PROJECT_ID` | `starter-dev` | `starter-prod` |
-| `STARTER_CORS_ALLOWED_ORIGINS` | `*` | specific origins |
-
-### Secrets (via `--set-secrets`)
-
-| Secret | Env var |
-|--------|---------|
-| `openai-api-key:latest` | `OPENAI_API_KEY` |
-| `actuator-password:latest` | `ACTUATOR_PASSWORD` |
-
----
-
-## 6. GitHub Actions Workflows (planned)
-
-### 1.1 Monorepo workflows
-
-GitHub Actions workflows live at the **repository root**:
+## Repository workflows
 
 ```text
 .github/workflows/
-  ci-backend.yml          # paths: starter-backend/**
-  deploy-dev-backend.yml
-  deploy-prod-backend.yml
-  ci-mobile.yml           # paths: starter-mobile/**
-  eas-build-dev.yml
-  eas-submit-prod.yml
+├── ci.yml
+├── deploy-dev.yml
+├── promote-prod.yml
+├── infra-plan.yml
+└── infra-apply.yml
 ```
 
-Use `paths` filters so a change in `starter-mobile/` does not redeploy the backend (and vice versa).
+### `ci.yml`
 
-### 6.1 `deploy-dev.yml` (backend)
+Trigger: every pull request and push to `main`.
 
-Trigger: push to `main`
+Required checks:
 
-Steps:
+1. Use the pinned Java distribution/version.
+2. `./mvnw verify -B`.
+3. Validate `openapi/openapi.yaml` and implementation compatibility.
+4. Dependency/license policy and secret scan.
+5. Build the Docker image and start it with safe test configuration.
+6. Assert liveness and fail-closed profile behavior.
 
-1. Checkout
-2. Authenticate to GCP via Workload Identity Federation
-3. `mvn clean package -DskipTests` (run tests locally until CI test step is added)
-4. `docker build` + push to Artifact Registry (`:sha-${{ github.sha }}`)
-5. `gcloud run deploy starter-api-dev` with new image
+The branch is protected so a PR cannot merge unless required checks pass.
 
-### 6.2 `deploy-prod.yml`
+### `deploy-dev.yml`
 
-Trigger: `workflow_dispatch` with confirmation input (e.g. type `deploy`)
+Trigger: push to protected `main`, or a reusable workflow called only after verification. Jobs in the workflow have explicit dependencies:
 
-Steps:
-
-1. Same build/push (or reuse DEV image tag from input)
-2. `gcloud run deploy starter-api-prod`
-3. GitHub `environment: production` for approval gate
-
-### 6.3 Authentication to GCP
-
-Use **Workload Identity Federation** — no long-lived service account keys in GitHub secrets.
-
-Setup documented in `scripts/COMMON_GCP_SETUP.md` § Workload Identity Federation.
-
-Required GitHub secrets:
-
-| Secret | Description |
-|--------|-------------|
-| `WIF_PROVIDER` | `projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/...` |
-| `WIF_SERVICE_ACCOUNT` | `github-actions@starter-dev.iam.gserviceaccount.com` |
-
----
-
-## 7. Dockerfile (planned)
-
-Multi-stage build:
-
-```dockerfile
-# Stage 1: Maven build
-FROM eclipse-temurin:21-jdk-alpine AS build
-WORKDIR /app
-COPY pom.xml mvnw ./
-COPY .mvn .mvn
-RUN ./mvnw dependency:go-offline
-COPY src ./src
-RUN ./mvnw package -DskipTests
-
-# Stage 2: Runtime
-FROM eclipse-temurin:21-jre-alpine
-WORKDIR /app
-COPY --from=build /app/target/*.jar app.jar
-ENV PORT=8080
-EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+```text
+verify -> build-and-push -> deploy-dev -> smoke-dev
 ```
 
----
+Requirements:
 
-## 8. Rollback
+- Build exactly once from the checked-out commit.
+- Push an immutable commit tag and capture the registry digest.
+- Generate SBOM/provenance and apply the vulnerability policy.
+- Deploy `IMAGE_URI@sha256:DIGEST`, not `:latest` or a mutable tag.
+- Record commit, digest, Cloud Run revision, workflow run, and timestamp.
+- Mark the digest eligible for production only after smoke tests pass.
 
-### Quick rollback (Cloud Run)
+Use a DEV concurrency group with cancellation so an older queued deployment cannot replace a newer one.
 
-```bash
-# List revisions
-gcloud run revisions list --service=starter-api-prod --region=europe-west2
+### `promote-prod.yml`
 
-# Route 100% traffic to previous revision
-gcloud run services update-traffic starter-api-prod \
-  --to-revisions=starter-api-prod-00042-abc=100 \
-  --region=europe-west2
+Trigger: manual workflow with an eligible digest/release identifier.
+
+Requirements:
+
+- Use the protected `production` GitHub environment.
+- Require approval and disallow self-approval where supported.
+- Authenticate with a PROD-specific WIF principal.
+- Verify the digest exists, was produced by this repository, and passed DEV.
+- Do not check out/build application source.
+- Deploy the exact digest and record the production revision.
+- Run minimal non-destructive smoke checks.
+- Leave the previous healthy revision available for rollback.
+
+GitHub environments can hold protected configuration/secrets and approval rules; see [GitHub's deployment environments documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments).
+
+## Artifact Registry design
+
+Recommended for stable promotion: one private Artifact Registry repository dedicated to release artifacts, accessible read-only to the DEV and PROD Cloud Run service agents. It may live in a small shared platform project or another explicitly chosen project.
+
+Cloud Run supports deploying by exact digest and from an Artifact Registry repository in another project when the deployer and Cloud Run service agent have the required access. See [Deploy container images to Cloud Run](https://docs.cloud.google.com/run/docs/deploying).
+
+If the organization forbids a shared registry, copy the tested digest into the PROD registry without rebuilding and verify the destination digest matches. Document and automate the copy; source recompilation is not promotion.
+
+## Authentication and permissions
+
+Use GitHub Actions OIDC to Google Workload Identity Federation. Restrict the provider condition to the exact repository and expected branch/environment. GitHub documents the short-lived-token pattern in [Configuring OpenID Connect in Google Cloud](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-google-cloud-platform).
+
+Separate identities:
+
+| Identity | Minimum purpose |
+|---|---|
+| CI | Read source/dependencies; no cloud deploy |
+| DEV builder/publisher | Push release image and attestations |
+| DEV deployer | Deploy DEV service and read selected secrets/config |
+| PROD deployer | Deploy an approved digest to PROD only |
+| Runtime DEV/PROD | Access only environment-owned data and runtime secrets |
+
+Avoid project-wide Owner/Editor roles. Grant IAM at the repository, service, secret, or database scope where practical.
+
+## Environment configuration
+
+GitHub environment variables hold non-secret values:
+
+- `GCP_PROJECT_ID`
+- `GCP_REGION`
+- `CLOUD_RUN_SERVICE`
+- `ARTIFACT_IMAGE`
+- runtime service account email
+
+Secret Manager holds runtime secrets. GitHub passes Secret Manager references to Cloud Run; it does not read provider keys into build logs.
+
+## Cloud Run baseline
+
+Start small and tune from measurements:
+
+| Setting | DEV | PROD |
+|---|---|---|
+| Min instances | `0` | `0` initially; raise only for latency SLO |
+| Max instances | low cost cap | explicit cost/capacity cap |
+| Concurrency | load-tested value | load-tested value |
+| CPU/memory | smallest passing load test | based on load test |
+| Startup probe | liveness | liveness |
+| Deployment check | readiness + API smoke | readiness + non-destructive smoke |
+
+Do not copy fixed CPU, memory, or max-instance numbers to every app without a load/cost decision.
+
+## Database changes
+
+Firestore is schema-flexible, but data changes can still break releases. Any migration/backfill must be:
+
+- backward-compatible with the currently deployed mobile/backend;
+- idempotent and resumable;
+- separately observable and rate-limited;
+- deployed before code that requires the new data;
+- documented with rollback/forward-fix behavior.
+
+## Release metadata
+
+Store for each deployment:
+
+```text
+git commit
+container digest
+SBOM/provenance reference
+OpenAPI contract version
+Cloud Run revision
+target environment
+workflow run URL
+approver and timestamp
+smoke-test result
 ```
 
-### Redeploy previous image
+## Rollback
 
-```bash
-gcloud run deploy starter-api-prod \
-  --image=europe-west2-docker.pkg.dev/starter-prod/starter-api/starter-api:sha-PREVIOUS_SHA \
-  --region=europe-west2
-```
+Primary rollback: route traffic to the last known-good Cloud Run revision. Secondary rollback: redeploy the last known-good digest.
 
----
+Rollback does not reverse data changes. Prefer backward-compatible changes and forward fixes; document any exceptional data recovery procedure before deploying the change.
 
-## 9. Mobile Coordination
+Perform a rollback drill before template v1 and periodically for each product.
 
-Before promoting backend PROD:
+## Acceptance criteria
 
-1. DEV mobile build validated against DEV API
-2. `GET /api/me` and `POST /api/chat` work end-to-end
-3. Firebase project alignment confirmed (DEV mobile → DEV backend)
-
-Mobile CI/CD: [starter-mobile/docs/mobile_cicd_deployment_plan.md](../../starter-mobile/docs/mobile_cicd_deployment_plan.md).
-
----
-
-## 10. Observability
-
-- **Logs:** Cloud Logging (JSON structured logs in `dev`/`prod` profiles)
-- **Health:** Cloud Run uses `/actuator/health`
-- **Metrics:** Cloud Run built-in metrics; optional Spring Actuator metrics behind admin auth
-- **Alerts:** Configure Cloud Monitoring alerts on error rate and latency (post-MVP)
-
----
-
-## Related docs
-
-- [scripts/COMMON_GCP_SETUP.md](../scripts/COMMON_GCP_SETUP.md)
-- [scripts/DEV_SETUP.md](../scripts/DEV_SETUP.md)
-- [scripts/PROD_SETUP.md](../scripts/PROD_SETUP.md)
-- [../../docs/NEW_APP_WORKFLOW.md](../../docs/NEW_APP_WORKFLOW.md)
+- [ ] A failed verification prevents image publication and deployment
+- [ ] DEV displays the same digest recorded by CI
+- [ ] PROD workflow has no build step
+- [ ] PROD deployment requires protected-environment approval
+- [ ] Long-lived GCP keys are absent from GitHub
+- [ ] Runtime identities cannot access the other environment
+- [ ] Post-deploy smoke failure is visible and has a documented rollback action
+- [ ] A rollback drill has succeeded

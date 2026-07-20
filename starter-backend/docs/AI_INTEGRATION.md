@@ -1,153 +1,114 @@
 # AI Integration
 
-The starter backend integrates AI via **Spring AI** with an **OpenAI-compatible API** (OpenRouter). The MVP exposes a single `POST /api/chat` endpoint.
+## Scope
 
-## Architecture
+The starter proves one secure, server-side AI call. It does not provide conversation memory, RAG, agents, tools, embeddings, or product prompts.
 
 ```text
-ChatController → ChatService → AiChatPort
-                                  ├── SpringAiOpenRouterAdapter (@Profile !local)
-                                  └── MockAiChatAdapter (@Profile local)
+AI controller -> application service -> AiChatPort -> provider adapter
+                                      -> local deterministic adapter
 ```
 
-Business logic in `ChatService` — adapters only handle provider communication.
+The application owns policy. The adapter owns provider protocol.
 
-## AiChatPort
-
-```java
-public interface AiChatPort {
-    String complete(String userMessage, Optional<String> sessionId);
-}
-```
-
-Extend to multi-turn when needed:
-
-```java
-String complete(List<ChatMessage> history, String userMessage);
-```
-
-## API contract
-
-### Request
+## Target API
 
 ```http
-POST /api/chat
-Authorization: Bearer <firebase_id_token>
+POST /api/v1/ai/chat
+Authorization: Bearer <firebase-id-token>
 Content-Type: application/json
 
-{
-  "message": "Hello!",
-  "sessionId": "optional-uuid"
-}
+{"message":"Give me one concise idea"}
 ```
-
-| Field | Required | Description |
-|-------|----------|-------------|
-| `message` | Yes | User message (max length enforced in validation) |
-| `sessionId` | No | For multi-turn; server generates if omitted |
-
-### Response
 
 ```json
 {
-  "reply": "Hello! I'm the starter kit assistant.",
-  "sessionId": "550e8400-e29b-41d4-a716-446655440000"
+  "reply": "...",
+  "requestId": "01K..."
 }
 ```
 
-### Errors
+Constraints:
 
-| Status | Cause |
-|--------|-------|
-| `400` | Empty or invalid message |
-| `401` | Missing/invalid token |
-| `429` | Rate limit (future) |
-| `502` | OpenRouter / AI provider failure |
+- authenticated user required;
+- non-blank, bounded Unicode input;
+- one provider call per accepted request;
+- stateless response;
+- provider details do not leak through errors;
+- prompt/reply content is not logged by default.
 
-## Spring AI configuration (planned)
+The prototype's `sessionId` is only echoed/generated; it does not load history and must not be documented as multi-turn memory.
 
-### application.yml (base)
+## Port design
 
-```yaml
-spring:
-  ai:
-    openai:
-      api-key: ${OPENAI_API_KEY:}
-      base-url: https://openrouter.ai/api/v1
-      chat:
-        options:
-          model: openai/gpt-4o-mini
-          temperature: 0.7
+Use provider-neutral input/output that can grow without importing Spring AI/provider types into application code:
+
+```java
+public interface AiChatPort {
+    AiReply complete(AiPrompt prompt);
+}
 ```
 
-### Local profile
+`AiPrompt` can contain the validated message and policy-selected options. End users do not choose unrestricted provider/model identifiers.
 
-```yaml
-spring:
-  ai:
-    openai:
-      api-key: mock-key
-      base-url: ${LOCAL_AI_URL:http://localhost:8081/v1}
+## Required controls before template v1
+
+| Control | Behavior |
+|---|---|
+| Authentication | Derive quota key from verified UID |
+| Input limit | Reject before provider call |
+| Rate limit | Per UID plus coarse IP/instance protection |
+| Usage budget | Daily/monthly user and environment cost cap |
+| Timeout | Bound provider latency and release server resources |
+| Retry | Only safe transient failures; short capped backoff |
+| Concurrency | Limit in-flight provider calls |
+| Error mapping | Stable `429`, `502`, `503`, `504` application errors |
+| Telemetry | Duration, outcome, model/config version, token/cost counts when available |
+| Privacy | No prompt/reply logging; define provider retention policy per product |
+
+Return `Retry-After` when the client can safely retry. Do not claim `429` support until these controls and tests exist.
+
+## Configuration
+
+Configuration is environment-managed:
+
+```text
+OPENAI_API_KEY        # Secret Manager
+AI_MODEL              # approved model identifier
+AI_REQUEST_TIMEOUT    # bounded duration
+AI_MAX_INPUT_CHARS    # server-side validation
+AI_USER_RATE_LIMIT    # policy value
+AI_USER_BUDGET        # policy value
 ```
 
-With `local` profile, `MockAiChatAdapter` returns deterministic echo responses without calling OpenRouter.
+The local profile uses a deterministic fake and no provider key. DEV uses a low-limit key/account where possible. PROD has separate budgets and alerts.
 
-### Cloud profiles (dev / prod)
+OpenRouter is the initial OpenAI-compatible provider. Spring AI/provider classes stay inside the adapter/configuration boundary so a product can swap providers without changing application use cases.
 
-API key from Secret Manager:
+## Model changes
 
-```bash
-# Cloud Run deploy
---set-secrets=OPENAI_API_KEY=openai-api-key:latest
-```
+A model identifier is behavioral configuration, not a harmless secret rotation. Change it through a reviewed release with:
 
-## OpenRouter setup
+- representative evaluation cases;
+- latency/cost comparison;
+- safety and output-format checks;
+- rollback to the prior configuration;
+- recorded configuration/model version in metrics.
 
-1. Create account at [openrouter.ai](https://openrouter.ai)
-2. Generate API key (`sk-or-v1-...`)
-3. Store in GCP Secret Manager as `openai-api-key`
-4. Set locally: `export OPENAI_API_KEY=sk-or-v1-...`
+## Conversation memory extension
 
-## Mock adapter (local profile)
+Add only when a product requires it. It needs:
 
-`MockAiChatAdapter` behavior:
+- authenticated ownership of conversations;
+- a persisted ordered message model;
+- truncation/token-budget rules;
+- concurrency/idempotency semantics;
+- retention, export, and deletion;
+- prompt-injection and tool authorization policy;
+- tests proving one user cannot access another user's history.
 
-- Returns `"Echo: {message}"` or a fixed greeting
-- No network calls
-- Enables offline development and fast tests
+A client-provided `sessionId` alone is not conversation memory or an authorization boundary.
 
-## Session handling (MVP)
+## RAG/tool extension
 
-MVP can be **stateless** (each request independent) or store session ID in memory/Firestore for multi-turn.
-
-Recommended MVP: generate `sessionId` per request if not provided; optional Firestore `chat_sessions` collection in Phase 2.
-
-## Rate limiting (future)
-
-When adding limits:
-
-- Enforce in `ChatService` before calling `AiChatPort`
-- Return `429` with `Retry-After` header
-- Per-user counters in Firestore or Redis
-
-## Model selection
-
-Default: `openai/gpt-4o-mini` (cost-effective for starter).
-
-Change via `spring.ai.openai.chat.options.model` per profile. OpenRouter supports many models — see [openrouter.ai/models](https://openrouter.ai/models).
-
-## Extension: RAG
-
-Not in starter MVP. When needed:
-
-1. Add `EmbeddingPort` and `VectorSearchPort`
-2. Retrieve context in `ChatService` before calling `AiChatPort`
-3. Include citations in response DTO
-
-Reference: docsera architecture plan (RAG section).
-
-## Related docs
-
-- [backend_architecture_plan.md](./backend_architecture_plan.md)
-- [MVP_SCOPE_CHECKLIST.md](./MVP_SCOPE_CHECKLIST.md)
-- [scripts/INTEGRATION_ENV_CONFIG.md](../scripts/INTEGRATION_ENV_CONFIG.md)
+Keep retrieval and tools as separate ports/use cases. Treat retrieved text and tool output as untrusted input. Enforce tool authorization outside the model and include citations/traceability in the product contract.

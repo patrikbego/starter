@@ -1,56 +1,60 @@
-# Starter Kit
+# Application Starter Workspace
 
-A documentation-first **monorepo** boilerplate for quickly spinning up new mobile + backend products. Based on patterns proven in [docsera](https://github.com/patrikbego/docsera) and [docsera-mobile](https://github.com/patrikbego/docsera-mobile).
-
-## Monorepo layout
+Documentation-first workspace for two reusable application templates:
 
 ```text
-starter/                          # single git repository
-├── README.md
-├── docs/                           # cross-cutting guides (new-app workflow, env matrix)
-├── starter-backend/                # Spring Boot API (Java 21, Cloud Run)
-└── starter-mobile/                 # Expo SDK 54 client
+starter/
+├── starter-backend/   # intended independent Git repository
+├── starter-mobile/    # intended independent Git repository
+└── docs/              # temporary cross-repository design and bootstrap guides
 ```
 
-| Package | Purpose |
-|---------|---------|
-| `docs/` | Architecture overview, new-app workflow, environment matrix |
-| `starter-backend/` | Spring Boot API on Cloud Run (Firebase, Firestore, Spring AI) |
-| `starter-mobile/` | Expo SDK 54 client (Firebase Auth, typed REST client) |
+The backend and mobile templates have independent release cycles and CI/CD. A product created from them normally becomes two repositories such as `myapp-backend` and `myapp-mobile`. They integrate through a versioned HTTP contract; neither repository reaches into the other's source tree.
 
-One repository, one `git push` — CI/CD workflows use path filters to deploy backend and mobile independently.
+> Current workspace status: both prototypes are still tracked by the parent `starter` Git repository and the workflows still live in the parent `.github/` directory. The documentation defines the target two-repository design. Repository extraction and workflow relocation are the next implementation phase; they are intentionally not performed during this docs-first phase.
 
-## Minimal integration surface
+## What the templates provide
 
-| Layer | Backend | Mobile |
-|-------|---------|--------|
-| Health | `GET /actuator/health` | Home screen reachability badge |
-| Auth | Firebase token verification → `GET /api/me` | Login + auth gate |
-| AI | `POST /api/chat` (Spring AI + OpenRouter) | Simple chat screen |
-| DB | Firestore user profile (behind a port) | Display user from `/api/me` |
+| Capability | Backend template | Mobile template |
+|---|---|---|
+| Identity | Firebase ID-token verification | Firebase sign-in and token refresh |
+| User data | Firestore user profile behind a repository port | Typed `/me` query and authenticated UI |
+| AI | Server-side provider adapter and a minimal chat use case | Thin chat UI; no provider key in the app |
+| Security | Fail-closed profiles, authorization, validation, safe errors | Secure session handling and no server secrets |
+| Operations | Health/readiness, structured logs, correlation IDs | Environment diagnostics and recoverable errors |
+| Delivery | Immutable container promotion to Cloud Run | EAS preview builds plus store release-candidate builds |
 
-Product-specific logic is added **after** forking — see [docs/NEW_APP_WORKFLOW.md](./docs/NEW_APP_WORKFLOW.md).
+Product-specific entities, workflows, prompts, screens, billing, storage, search, and background jobs are extensions, not starter-core features.
 
-## Quick start
+## Documentation-first entry points
 
-1. Read [docs/ARCHITECTURE_OVERVIEW.md](./docs/ARCHITECTURE_OVERVIEW.md) for the full stack.
-2. **Run the apps:** [starter-backend/run/README.md](./starter-backend/run/README.md) and [starter-mobile/run/README.md](./starter-mobile/run/README.md)
-3. Follow [docs/NEW_APP_WORKFLOW.md](./docs/NEW_APP_WORKFLOW.md) to fork this monorepo into a new product.
-4. Use [docs/ENVIRONMENT_MATRIX.md](./docs/ENVIRONMENT_MATRIX.md) when configuring DEV/PROD.
+1. Read [the project review](./docs/REVIEW_FINDINGS.md) for the current gaps and recommended priorities.
+2. Read [the architecture overview](./docs/ARCHITECTURE_OVERVIEW.md) for system boundaries.
+3. Read [the repository strategy](./docs/REPOSITORY_STRATEGY.md) before splitting the workspace.
+4. Use [the implementation roadmap](./docs/IMPLEMENTATION_ROADMAP.md) to move from prototype to template v1.
+5. Use [the new-app workflow](./docs/NEW_APP_WORKFLOW.md) after both templates have a tagged release.
 
-## Deployment model
+Repository-specific docs:
+
+- [Backend documentation](./starter-backend/docs/README.md)
+- [Mobile documentation](./starter-mobile/docs/README.md)
+
+## Target release model
 
 ```text
-merge to main  →  auto-deploy DEV (backend Cloud Run + mobile EAS internal build)
-manual approval  →  PROD (same Docker image / same EAS build ID)
+backend main -> CI -> one immutable image digest -> DEV -> approved PROD promotion
+mobile main  -> CI -> DEV preview build
+mobile tag   -> store-signed release candidate -> TestFlight/Play internal -> release same binary
 ```
 
-## Documentation index
+“Build once, promote” applies within one releasable artifact type. An EAS internal preview binary is not a store binary and is never presented as one.
 
-See [docs/README.md](./docs/README.md).
+## Definition of ready for template v1
 
-## Status
-
-**Backend MVP implemented** — Spring Boot API with auth, `/api/me`, `/api/chat`, Docker, and GitHub Actions CI/CD in `starter-backend/`.
-
-**Mobile MVP implemented** — Expo SDK 54 app with Firebase Auth, home (`/api/me` + health), chat (`/api/chat`), and GitHub Actions + EAS CI/CD in `starter-mobile/`.
+- Two independent Git repositories with their own workflows and ownership rules
+- Versioned OpenAPI contract owned by the backend and consumed by the mobile app
+- Explicit profiles; a missing cloud profile cannot activate mock authentication
+- CI gates deployment and production uses the exact tested backend image digest
+- Mobile preview and store-release flows are separate and documented accurately
+- Security, AI cost controls, observability, rollback, and bootstrap steps are tested
+- A clean new product can be created from tagged template releases without editing starter infrastructure by hand

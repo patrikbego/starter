@@ -1,206 +1,141 @@
 # Backend Integration
 
-How the starter mobile app connects to the starter-backend API.
+## Contract boundary
 
-## Overview
+The mobile repository consumes a published, versioned backend OpenAPI contract. It does not copy backend DTOs by hand indefinitely and does not require a sibling backend checkout.
 
-```text
-Mobile (Expo)                    Backend (Cloud Run)
-─────────────                    ───────────────────
-Firebase Auth ID token    →      Token verification
-Bearer on every request   →      Authorization
-REST JSON                 ↔      /api/me, /api/chat
-```
+Target starter endpoints:
 
-## Base URL configuration
+| Method | Path | Auth | Mobile use |
+|---|---|---|---|
+| `GET` | `/health/live` | Public | Coarse reachability only |
+| `GET` | `/api/v1/me` | Bearer | User profile/bootstrap |
+| `POST` | `/api/v1/ai/chat` | Bearer | Stateless AI interaction |
 
-Set at build time via `app.config.ts`:
+The prototype currently calls `/actuator/health`, `/api/me`, and `/api/chat`. Migrate together with the versioned contract before template v1.
 
-| `APP_ENV` | Variable | Example |
-|-----------|----------|---------|
-| `development` | `API_BASE_URL_DEV` | `https://starter-api-dev-XXX.europe-west2.run.app` |
-| `production` | `API_BASE_URL_PROD` | `https://starter-api-prod-XXX.europe-west2.run.app` |
+## Contract versioning
 
-Runtime access:
+- Backend owns `openapi/openapi.yaml` and publishes a tagged artifact/release URL.
+- Mobile pins a known contract version or generated-client package checksum.
+- CI verifies generated types/fixtures are current.
+- Additive backend changes remain compatible within `v1`.
+- Breaking changes introduce `v2` and coexist until supported store clients migrate.
 
-```typescript
-import Constants from 'expo-constants';
+## Environment URL
 
-export const config = {
-  apiBaseUrl: Constants.expoConfig?.extra?.apiBaseUrl as string,
-  appEnv: Constants.expoConfig?.extra?.appEnv as string,
-};
-```
+Read `EXPO_PUBLIC_API_BASE_URL` through validated config. Rules:
 
-**Never hardcode** API URLs in source files.
+- production: required HTTPS PROD URL;
+- preview: required DEV HTTPS URL;
+- local: localhost/LAN/tunnel only with deliberate local mode;
+- trim trailing slash once and reject unexpected schemes/embedded credentials;
+- never hardcode a production fallback.
 
-## Authentication header
+## Authentication
 
-Every protected request:
+Protected request:
 
 ```http
-Authorization: Bearer <firebase_id_token>
+Authorization: Bearer <firebase-id-token>
 ```
 
-### Token acquisition
-
-```typescript
-// After Firebase sign-in
-const token = await firebaseUser.getIdToken();
-```
-
-### Token refresh on 401
+On `401`:
 
 ```text
-Request fails with 401
-  → call getIdToken(true) to force refresh
-  → retry request once
-  → if still 401, sign out and redirect to login
+request -> 401 -> one shared forced token refresh -> retry once
+                                              -> second 401 -> sign out
 ```
 
-## API client pattern (planned)
+The adapter prevents refresh storms across concurrent requests and never logs the token. `403` means the session may still be valid; show a permission error rather than refreshing repeatedly.
 
-```typescript
-// src/adapters/HttpApiClient.ts
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = await authPort.getIdToken();
-  const response = await fetch(`${config.apiBaseUrl}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...options?.headers,
-    },
-  });
-  if (response.status === 401) {
-    // refresh + retry logic
-  }
-  if (!response.ok) throw new ApiError(response.status, await response.text());
-  return response.json();
+## Request behavior
+
+The HTTP adapter must:
+
+- apply a finite timeout with `AbortController`;
+- encode JSON only when a body exists;
+- parse the standard error envelope;
+- distinguish offline/timeout/server/validation/rate-limit errors;
+- retry automatically only when idempotent and policy permits;
+- accept/return correlation IDs for support without exposing payloads.
+
+## Standard error
+
+```json
+{
+  "code": "VALIDATION_ERROR",
+  "message": "Message must not be empty",
+  "correlationId": "01K..."
 }
 ```
 
-## Endpoints
+Recommended UX mapping:
 
-### Health check (public)
+| Status | Client behavior |
+|---|---|
+| `400` | Show actionable validation message |
+| `401` | Refresh once, retry once, then sign out |
+| `403` | Permission message; do not refresh loop |
+| `404` | Resource unavailable/navigate safely |
+| `409` | Refresh conflicting state |
+| `429` | Respect `Retry-After`; disable immediate resend |
+| `502/503/504` | Temporary service message and deliberate retry |
+| Network/timeout | Offline/timeout state; preserve user input |
 
-```http
-GET /actuator/health
-```
-
-No auth required. Used for backend reachability badge on home screen.
-
-```typescript
-// Can use fetch without Bearer for health only
-const res = await fetch(`${config.apiBaseUrl}/actuator/health`);
-const { status } = await res.json(); // "UP"
-```
-
-### Current user
+## Current user
 
 ```http
-GET /api/me
+GET /api/v1/me
 Authorization: Bearer <token>
 ```
-
-Response:
 
 ```json
 {
   "id": "firebase-uid",
   "email": "user@example.com",
   "displayName": "Jane Doe",
-  "createdAt": "2026-01-15T10:00:00Z"
+  "createdAt": "2026-07-20T10:00:00Z"
 }
 ```
 
-TanStack Query hook:
+Cache under `['me']`; clear protected query data on sign-out or user change.
 
-```typescript
-export function useMe() {
-  return useQuery({
-    queryKey: ['me'],
-    queryFn: () => apiClient.get<MeResponse>('/api/me'),
-  });
-}
-```
-
-### AI chat
+## AI request
 
 ```http
-POST /api/chat
+POST /api/v1/ai/chat
 Authorization: Bearer <token>
 Content-Type: application/json
 
-{
-  "message": "Hello!",
-  "sessionId": "optional-uuid"
-}
+{"message":"Hello"}
 ```
-
-Response:
 
 ```json
 {
-  "reply": "Hello! I'm the starter kit assistant.",
-  "sessionId": "550e8400-e29b-41d4-a716-446655440000"
+  "reply": "Hello!",
+  "requestId": "01K..."
 }
 ```
 
-Mutation hook:
-
-```typescript
-export function useSendChat() {
-  return useMutation({
-    mutationFn: (body: ChatRequest) =>
-      apiClient.post<ChatResponse>('/api/chat', body),
-  });
-}
-```
-
-## Error handling
-
-| Status | User message | Action |
-|--------|--------------|--------|
-| 401 | Session expired | Refresh token → retry → sign out |
-| 400 | Invalid message | Show validation error |
-| 429 | Too many requests | Show retry later |
-| 502 | Service unavailable | Show try again |
-| Network error | No connection | Show offline message |
+The starter interaction is stateless. The app may display a transient list of messages, but it must not tell users the server remembers a conversation. On failure, preserve the typed message and prevent duplicate sends while one request is pending.
 
 ## Environment pairing
 
-| Mobile build | Firebase project | API URL |
-|--------------|------------------|---------|
-| DEV (`development`) | `starter-dev` | DEV Cloud Run |
-| PROD (`production`) | `starter-prod` | PROD Cloud Run |
+| Build | Firebase | Backend |
+|---|---|---|
+| Local/preview | DEV Firebase | local/DEV API |
+| Production | PROD Firebase | PROD API |
 
-Cross-wiring DEV mobile to PROD API (or vice versa) causes auth failures.
+Build configuration validates the pairing. A mismatch commonly causes token audience/project failures and must not be discovered only after store upload.
 
-## Firebase alignment
+## Integration test fixture
 
-Mobile Firebase `projectId` must match the backend's Firebase project for the same environment.
+Mobile CI should test the client against contract fixtures/mocks. Real DEV device smoke tests cover:
 
-Backend verifies tokens issued by that Firebase project via Firebase Admin SDK.
-
-## Local development
-
-Against local backend:
-
-```typescript
-// Expo dev with localhost (use machine IP for physical device)
-apiBaseUrl: 'http://localhost:8080'
-```
-
-Against DEV Cloud Run from device: use DEV Cloud Run HTTPS URL.
-
-## Testing without mobile
-
-Use curl with Firebase emulator token — see [starter-backend/scripts/DEV_LOCAL_SETUP.md](../starter-backend/scripts/DEV_LOCAL_SETUP.md).
-
-## Related docs
-
-- [starter-backend/docs/AUTHENTICATION.md](../starter-backend/docs/AUTHENTICATION.md)
-- [starter-backend/docs/AI_INTEGRATION.md](../starter-backend/docs/AI_INTEGRATION.md)
-- [../../docs/ENVIRONMENT_MATRIX.md](../../docs/ENVIRONMENT_MATRIX.md)
-- [mobile_architecture_plan.md](./mobile_architecture_plan.md)
+1. auth restoration;
+2. valid `/me`;
+3. invalid token and single refresh;
+4. stateless AI success;
+5. validation/rate-limit/provider failure mapping;
+6. sign-out clearing protected cache.

@@ -1,91 +1,79 @@
 # Starter Backend
 
-Generic Spring Boot API boilerplate for mobile-first products. Deployed on Google Cloud Run with Firebase Auth, Firestore, and Spring AI.
+Reusable Spring Boot backend foundation for new applications. It provides identity verification, a minimal user record, a provider-neutral AI use case, operational health, and a Cloud Run delivery pattern. Product domains are added after creating a product repository from a tagged template release.
 
-## Quick start
+> Status: functional prototype. The local API and tests work, but the repository split, versioned OpenAPI contract, fail-closed profile change, dependency upgrade, AI limits, infrastructure-as-code, and corrected promotion workflow are still required before template v1.
 
-**New to the project?** Start with the step-by-step run guides: [run/README.md](./run/README.md)
-
-### Local offline development (mocks)
+## Prototype quick start
 
 ```bash
-cd starter-backend
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
-Optional: start Firebase emulators for auth/firestore testing:
-
 ```bash
-firebase emulators:start --only auth,firestore
-export FIRESTORE_EMULATOR_HOST=localhost:8080
-export FIREBASE_AUTH_EMULATOR_HOST=localhost:9099
-export GOOGLE_CLOUD_PROJECT=starter-local
-./mvnw spring-boot:run -Dspring-boot.run.profiles=local
-```
-
-### Smoke test
-
-```bash
-./scripts/test/test-local.sh
-```
-
-## Minimal API
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/actuator/health` | Public | Health check |
-| GET | `/actuator/info` | Public | Build info |
-| GET | `/api/me` | Bearer token | Current user profile (auto-provisioned) |
-| POST | `/api/chat` | Bearer token | AI chat message |
-
-### Example requests (local profile)
-
-```bash
-# Health (no auth)
 curl http://localhost:8080/actuator/health
-
-# Me (mock accepts any token)
-curl -H "Authorization: Bearer test-token" http://localhost:8080/api/me
-
-# Chat
-curl -X POST -H "Authorization: Bearer test-token" \
-  -H "Content-Type: application/json" \
-  -d '{"message":"hello"}' \
-  http://localhost:8080/api/chat
+curl -H 'Authorization: Bearer local-test-token' http://localhost:8080/api/me
+curl -X POST http://localhost:8080/api/chat \
+  -H 'Authorization: Bearer local-test-token' \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"hello"}'
 ```
+
+The explicit `local` profile uses mock auth, persistence, and AI. Never deploy it.
+
+## Target template contract
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/health/live` | Public | Minimal liveness |
+| `GET` | `/health/ready` | Deployment checks | Dependency readiness |
+| `GET` | `/api/v1/me` | Firebase Bearer token | Current user |
+| `POST` | `/api/v1/ai/chat` | Firebase Bearer token | Stateless AI request |
+
+The current prototype routes are unversioned. The OpenAPI contract and `/api/v1` migration are part of the v1 roadmap.
+
+## Architecture
+
+```text
+api -> application -> domain
+             |          ^
+             v          |
+            ports <- adapters
+```
+
+- Domain and application code have no Firestore, Firebase, or AI-provider types.
+- Authenticated identity comes from the verified backend principal, never from request data.
+- External systems sit behind purposeful ports.
+- Local mocks are explicit, deterministic adapters.
 
 ## Profiles
 
-| Profile | Use case |
-|---------|----------|
-| `local` | Offline dev with mocks |
-| `dev-local` | IDE connected to real DEV GCP |
-| `dev` | Cloud Run DEV |
-| `prod` | Cloud Run PROD |
+| Profile | Use |
+|---|---|
+| `local` | Explicit offline mocks/emulators |
+| `dev-local` | Local JVM connected to DEV services |
+| `dev` | DEV Cloud Run |
+| `prod` | Production Cloud Run |
 
-See [scripts/DEV_LOCAL_SETUP.md](./scripts/DEV_LOCAL_SETUP.md) for dev-local setup.
+Target v1 has no default `local` profile. Missing cloud configuration must fail startup.
+
+## Verify
+
+```bash
+./mvnw verify
+docker build -t starter-backend:local .
+```
 
 ## Documentation
 
-See [docs/README.md](./docs/README.md).
+Start with [docs/README.md](./docs/README.md), then read:
 
-## Creating a new app
+- [Architecture](./docs/backend_architecture_plan.md)
+- [API and authentication](./docs/AUTHENTICATION.md)
+- [Database](./docs/DATABASE.md)
+- [AI integration](./docs/AI_INTEGRATION.md)
+- [Security](./docs/SECURITY.md)
+- [CI/CD and rollback](./docs/cicd_deployment_plan.md)
+- [Scope and readiness](./docs/MVP_SCOPE_CHECKLIST.md)
 
-Follow the monorepo guide: [../docs/NEW_APP_WORKFLOW.md](../docs/NEW_APP_WORKFLOW.md).
-
-## Tech stack
-
-- Java 21, Spring Boot 3.x, Spring Security, Spring AI
-- Google Cloud Run, Firestore, Secret Manager, Artifact Registry
-- Firebase Authentication
-- OpenRouter (OpenAI-compatible API via Spring AI)
-
-## CI/CD
-
-GitHub Actions workflows at the monorepo root:
-
-- `ci-backend.yml` — runs tests on PR/push
-- `deploy-dev-backend.yml` — auto-deploy to Cloud Run DEV on push to `main`
-- `deploy-prod-backend.yml` — manual promote to PROD
-
-See [docs/cicd_deployment_plan.md](./docs/cicd_deployment_plan.md).
+The companion mobile template is a separate repository and integrates only through the published API contract.
