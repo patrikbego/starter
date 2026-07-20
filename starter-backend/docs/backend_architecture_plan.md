@@ -18,11 +18,11 @@ The **mobile client** (Expo) is documented in [starter-mobile](../starter-mobile
 
 | Component | Status |
 |-----------|--------|
-| Documentation | Complete (docs phase) |
-| API: auth, `/api/me`, `/api/chat` | Planned |
-| Firestore user repository | Planned |
-| Spring AI + OpenRouter adapter | Planned |
-| GitHub Actions deploy workflows | Planned |
+| Documentation | Complete |
+| API: auth, `/api/me`, `/api/chat` | Implemented |
+| Firestore user repository | Implemented |
+| Spring AI + OpenRouter adapter | Implemented |
+| GitHub Actions deploy workflows | Implemented |
 | File upload / GCS | Extension only — see `STORAGE_EXTENSION.md` |
 
 ---
@@ -252,15 +252,15 @@ See [SECURITY.md](./SECURITY.md) and [AUTHENTICATION.md](./AUTHENTICATION.md).
 
 ### Phase 1: Foundation (starter MVP)
 
-- [ ] Project scaffold (Maven, Spring Boot, profiles)
-- [ ] Firebase auth filter + SecurityConfig
-- [ ] UserService + FirestoreUserRepositoryAdapter
-- [ ] MeController (`GET /api/me`)
-- [ ] AiChatPort + SpringAiOpenRouterAdapter + MockAiChatAdapter
-- [ ] ChatController (`POST /api/chat`)
-- [ ] Correlation ID + structured logging
-- [ ] Dockerfile + GitHub Actions deploy-dev / deploy-prod
-- [ ] Local profile with mocks
+- [x] Project scaffold (Maven, Spring Boot, profiles)
+- [x] Firebase auth filter + SecurityConfig
+- [x] UserService + FirestoreUserRepositoryAdapter
+- [x] MeController (`GET /api/me`)
+- [x] AiChatPort + SpringAiOpenRouterAdapter + MockAiChatAdapter
+- [x] ChatController (`POST /api/chat`)
+- [x] Correlation ID + structured logging
+- [x] Dockerfile + GitHub Actions deploy-dev / deploy-prod
+- [x] Local profile with mocks
 
 ### Phase 2: Extensions (per product)
 

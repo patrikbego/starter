@@ -2,7 +2,7 @@
 
 Minimal backend APIs for the starter kit. Use this to track implementation progress.
 
-**Status:** Docs phase — all items planned.
+**Status:** Implemented.
 
 ---
 
@@ -12,33 +12,33 @@ Minimal backend APIs for the starter kit. Use this to track implementation progr
 
 | Endpoint | Method | Auth | Status |
 |----------|--------|------|--------|
-| `/actuator/health` | GET | Public | Planned |
-| `/actuator/info` | GET | Public | Planned |
+| `/actuator/health` | GET | Public | Done |
+| `/actuator/info` | GET | Public | Done |
 
 **Acceptance criteria:**
 
-- [ ] Returns `200` with `{"status":"UP"}` when healthy
-- [ ] Cloud Run uses this for liveness probe
-- [ ] Mobile home screen can call this without auth
+- [x] Returns `200` with `{"status":"UP"}` when healthy
+- [x] Cloud Run uses this for liveness probe
+- [x] Mobile home screen can call this without auth
 
 ### 1.2 User
 
 | Endpoint | Method | Auth | Status |
 |----------|--------|------|--------|
-| `/api/me` | GET | Bearer | Planned |
+| `/api/me` | GET | Bearer | Done |
 
 **Acceptance criteria:**
 
-- [ ] Returns `401` without valid Firebase token
-- [ ] Returns user profile with `id`, `email`, `displayName`, `createdAt`
-- [ ] Creates Firestore user on first call (auto-provision)
-- [ ] Subsequent calls return same user without duplicate records
+- [x] Returns `401` without valid Firebase token
+- [x] Returns user profile with `id`, `email`, `displayName`, `createdAt`
+- [x] Creates Firestore user on first call (auto-provision)
+- [x] Subsequent calls return same user without duplicate records
 
 ### 1.3 AI Chat
 
 | Endpoint | Method | Auth | Status |
 |----------|--------|------|--------|
-| `/api/chat` | POST | Bearer | Planned |
+| `/api/chat` | POST | Bearer | Done |
 
 **Request body:**
 
@@ -48,12 +48,12 @@ Minimal backend APIs for the starter kit. Use this to track implementation progr
 
 **Acceptance criteria:**
 
-- [ ] Returns `401` without valid token
-- [ ] Returns `400` for empty message
-- [ ] Returns `{ "reply": "...", "sessionId": "..." }`
-- [ ] `local` profile uses mock adapter (no OpenRouter call)
-- [ ] `dev`/`prod` profiles call OpenRouter via Spring AI
-- [ ] Returns `502` when AI provider fails (with safe error message)
+- [x] Returns `401` without valid token
+- [x] Returns `400` for empty message
+- [x] Returns `{ "reply": "...", "sessionId": "..." }`
+- [x] `local` profile uses mock adapter (no OpenRouter call)
+- [x] `dev`/`prod` profiles call OpenRouter via Spring AI
+- [x] Returns `502` when AI provider fails (with safe error message)
 
 ---
 
@@ -61,16 +61,16 @@ Minimal backend APIs for the starter kit. Use this to track implementation progr
 
 | Item | Status |
 |------|--------|
-| Spring Boot project scaffold | Planned |
-| Profiles: `local`, `dev-local`, `dev`, `prod` | Planned |
-| Firebase auth filter | Planned |
-| Firestore user repository | Planned |
-| Mock adapters for `local` profile | Planned |
-| Dockerfile | Planned |
-| `deploy-dev.yml` GitHub Action | Planned |
-| `deploy-prod.yml` GitHub Action | Planned |
-| Correlation ID logging | Planned |
-| JSON logs in cloud profiles | Planned |
+| Spring Boot project scaffold | Done |
+| Profiles: `local`, `dev-local`, `dev`, `prod` | Done |
+| Firebase auth filter | Done |
+| Firestore user repository | Done |
+| Mock adapters for `local` profile | Done |
+| Dockerfile | Done |
+| `deploy-dev-backend.yml` GitHub Action | Done |
+| `deploy-prod-backend.yml` GitHub Action | Done |
+| Correlation ID logging | Done |
+| JSON logs in cloud profiles | Done |
 
 ---
 
