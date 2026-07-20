@@ -1,76 +1,36 @@
-# PROD Environment Setup
+# PROD Environment Bootstrap
 
-One-time setup for the `starter-prod` GCP project and Cloud Run PROD deployment.
+Provision PROD independently through reviewed infrastructure code. Never clone DEV credentials/data or grant the DEV workflow production access.
 
-## Prerequisites
+## PROD resources
 
-- DEV environment validated end-to-end (API + mobile)
-- GCP billing enabled
-- `gcloud` CLI authenticated
+- `{app}-prod` GCP/Firebase project and production billing alerts
+- Firestore in the chosen residency with deletion/backup policy
+- PROD Cloud Run service and runtime identity
+- PROD Secret Manager values and separate AI budget/key
+- read access to the immutable release artifact repository
+- PROD GitHub OIDC/WIF deploy identity
+- protected GitHub `production` environment with approval
+- alerts, incident ownership, and rollback access
 
-## Steps
+## Promotion policy
 
-### 1. Create GCP project
+Production workflow receives an eligible image digest that already passed DEV. It does not build source. The approver checks commit, digest, contract version, DEV result, data compatibility, and mobile compatibility.
 
-```bash
-gcloud projects create starter-prod --name="Starter PROD"
-gcloud billing projects link starter-prod --billing-account=YOUR_BILLING_ACCOUNT
-```
+## Mobile coordination
 
-### 2. Run common GCP setup
+A DEV preview binary is not a production artifact. The mobile repository creates a store-signed production candidate using PROD configuration, tests it through TestFlight/Play internal testing, then releases that same store binary.
 
-Follow [COMMON_GCP_SETUP.md](./COMMON_GCP_SETUP.md) with `[PROJECT_ID]=starter-prod`.
+## Checklist
 
-**PROD-specific:**
+- [ ] PROD cannot load local mocks
+- [ ] Firebase/API pairing is PROD-only
+- [ ] CORS contains exact required web origins
+- [ ] Public health exposes no build/config detail
+- [ ] Runtime and deploy identities have least privilege
+- [ ] Provider/data/log retention policies are approved
+- [ ] Backend promotion uses exact tested digest
+- [ ] Store client and backend API versions are compatible
+- [ ] Backend and mobile rollback drills completed
 
-- Enable Firestore delete protection
-- Use strong `actuator-password`
-- Restrict CORS origins in Cloud Run env
-
-### 3. Configure GitHub Actions
-
-Add PROD secrets or use GitHub `environment: production`:
-
-| Secret | Value |
-|--------|-------|
-| `WIF_PROVIDER` | PROD WIF provider (separate pool recommended) |
-| `WIF_SERVICE_ACCOUNT` | `github-actions@starter-prod.iam.gserviceaccount.com` |
-| `GCP_PROJECT_ID` | `starter-prod` |
-
-### 4. Firebase PROD
-
-1. Link `starter-prod` in Firebase Console
-2. Enable Authentication (same providers as DEV)
-3. Register production iOS/Android apps
-4. Update mobile EAS `production` profile with PROD Firebase keys
-
-### 5. First PROD deployment
-
-**Only after DEV validation.**
-
-Run manual `deploy-prod.yml` workflow with confirmation input.
-
-Verify:
-
-```bash
-curl https://starter-api-prod-XXXX.europe-west2.run.app/actuator/health
-```
-
-### 6. Mobile PROD submit
-
-Use the **same EAS build ID** tested against DEV API, submitted via manual `eas-submit-prod` workflow.
-
-## PROD checklist
-
-- [ ] Separate Firebase project from DEV
-- [ ] CORS restricted to production origins
-- [ ] Secrets in Secret Manager (not env vars in YAML)
-- [ ] Cloud Run max instances appropriate for expected load
-- [ ] Monitoring alerts configured (optional MVP)
-- [ ] Rollback procedure documented and tested
-
-## Related docs
-
-- [DEV_SETUP.md](./DEV_SETUP.md)
-- [../docs/cicd_deployment_plan.md](../docs/cicd_deployment_plan.md)
-- [../../docs/NEW_APP_WORKFLOW.md](../../docs/NEW_APP_WORKFLOW.md)
+See [DEV_SETUP.md](./DEV_SETUP.md), [COMMON_GCP_SETUP.md](./COMMON_GCP_SETUP.md), and [CI/CD](../docs/cicd_deployment_plan.md).

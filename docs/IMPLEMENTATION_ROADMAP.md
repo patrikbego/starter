@@ -1,0 +1,79 @@
+# Implementation Roadmap
+
+This roadmap starts from the current prototype. Complete phases in order; later phases assume earlier boundaries are stable.
+
+## Phase 0 — documentation baseline
+
+- [x] Define two-repository ownership
+- [x] Define target architecture and environment model
+- [x] Correct backend and mobile promotion concepts
+- [x] Record the prototype gaps
+- [ ] Approve repository names, GitHub organization, and history strategy
+
+Exit: architecture and ownership are accepted before code is moved.
+
+## Phase 1 — repository extraction
+
+- [ ] Create independent backend and mobile Git repositories
+- [ ] Move each workflow to its owning repository root
+- [ ] Remove monorepo path filters and `working-directory` assumptions
+- [ ] Fix all docs so standalone clones have no sibling-path dependency
+- [ ] Add branch protection, CODEOWNERS, Dependabot/Renovate, and secret scanning
+- [ ] Verify clean clones on supported developer platforms
+
+Exit: both repositories run their CI independently.
+
+## Phase 2 — contract and configuration safety
+
+- [ ] Add backend `openapi/openapi.yaml` and `/api/v1` routes
+- [ ] Standardize errors and correlation IDs
+- [ ] Pin/validate the contract from mobile CI
+- [ ] Remove the backend's implicit `local` default profile
+- [ ] Validate required backend and mobile variables at startup/build time
+- [ ] Split public liveness/readiness from protected actuator diagnostics
+
+Exit: cross-repository integration is explicit and missing production configuration fails closed.
+
+## Phase 3 — backend foundation hardening
+
+- [ ] Upgrade Spring Boot, Spring AI, Firebase Admin, and Google Cloud libraries to a supported baseline
+- [ ] Add AI timeout, rate limit, quota/budget, and safe telemetry
+- [ ] Make the AI endpoint explicitly stateless; defer conversation memory
+- [ ] Add integration tests for auth, errors, Firestore, and the OpenAPI contract
+- [ ] Add container scanning, SBOM/provenance, and digest capture
+- [ ] Add repeatable infrastructure code for DEV and PROD
+
+Exit: a tagged backend candidate can be reproduced and safely deployed.
+
+## Phase 4 — mobile foundation hardening
+
+- [ ] Reinstall dependencies from a clean lockfile state and make lint deterministic
+- [ ] Add unit/component tests for auth gating, API retry, and environment validation
+- [ ] Add generated or contract-checked API types
+- [ ] Add Firebase Auth persistence appropriate to React Native
+- [ ] Define app variants, bundle identifiers, schemes, and EAS environments
+- [ ] Configure runtime versions and update channels if EAS Update is retained
+
+Exit: preview and production candidates build from clean CI.
+
+## Phase 5 — delivery and recovery
+
+- [ ] Gate DEV deployment on the same backend CI job/workflow
+- [ ] Deploy backend by immutable digest and store release metadata
+- [ ] Protect production with a GitHub environment and approval
+- [ ] Build store-signed mobile candidates and test through store tracks
+- [ ] Add post-deploy smoke tests and automated failure reporting
+- [ ] Perform one backend rollback drill and one mobile release/OTA rollback drill
+
+Exit: the team can promote and recover without rebuilding or guessing.
+
+## Phase 6 — template release and new-app trial
+
+- [ ] Tag backend and mobile template `v1.0.0`
+- [ ] Create a disposable sample product from both tags
+- [ ] Provision DEV from scratch using only documented automation
+- [ ] Complete login -> `/me` -> AI request on a real device
+- [ ] Record setup time and every manual exception
+- [ ] Fix the template until the process is repeatable
+
+Exit: a new idea can reach a working DEV environment through the documented path.

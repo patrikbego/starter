@@ -1,69 +1,35 @@
-# Spring Boot Actuator Documentation
+# Health and Diagnostics
 
-Actuator endpoints for the starter API.
+## Prototype
 
-## Endpoints
+- `/actuator/health` is public.
+- `/actuator/info` is public and may contain build/git metadata.
+- Other actuator routes require the configured admin role, though only `health,info` are currently exposed.
 
-### Public (no authentication)
+## Target v1
 
-- **`GET /actuator/health`**
-  - Application health for Cloud Run liveness probes and mobile reachability checks.
-  - `200 OK` — healthy
-  - `503 Service Unavailable` — unhealthy
+Expose purpose-specific endpoints:
 
-- **`GET /actuator/info`**
-  - Build and git metadata (when configured).
+| Endpoint | Audience | Content |
+|---|---|---|
+| `/health/live` | Public/platform | Process can respond; no dependency/build detail |
+| `/health/ready` | Cloud Run/deployment checks | Whether instance should receive traffic |
+| Actuator diagnostics | Operators only | Detailed health/build/metrics as explicitly enabled |
 
-### Secured (`ROLE_ADMIN`, HTTP Basic)
+Do not expose environment variables, beans, config properties, heap data, or secrets. Avoid public build metadata unless a concrete client need outweighs fingerprinting risk.
 
-- **`GET /actuator/metrics`** (if exposed)
-- **`GET /actuator/env`** (if exposed)
-- **`GET /actuator/loggers`** (if exposed)
+## Semantics
 
-Access with:
+- Liveness must not depend on Firestore or the AI provider; dependency outages should not cause restart loops.
+- Readiness may include only dependencies required to serve normal traffic and must use short timeouts.
+- AI provider health is usually better represented by request metrics/circuit state than an active provider call from health checks.
 
-```bash
-curl -u admin:$ACTUATOR_PASSWORD https://starter-api-dev-XXX.run.app/actuator/metrics
-```
+## Deployment smoke check
 
-## Configuration (planned)
+After deploying a revision:
 
-In `application.yml`:
-
-```yaml
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics
-  endpoint:
-    health:
-      show-details: when_authorized
-  info:
-    build:
-      enabled: true
-    git:
-      mode: full
-```
-
-Cloud profiles (`dev`, `prod`): set `ACTUATOR_PASSWORD` from Secret Manager.
-
-## Build information
-
-Generated during Maven build:
-
-- `spring-boot-maven-plugin` — `build-info`
-- `git-commit-id-maven-plugin` — git commit in `/actuator/info`
-
-## Cloud Run health check
-
-Cloud Run automatically probes the service. Ensure:
-
-- App listens on `$PORT` (default 8080)
-- `/actuator/health` responds within startup timeout
-- Firestore/Firebase failures may mark health down if configured in custom `HealthIndicator`
-
-## Related docs
-
-- [SECURITY.md](../SECURITY.md)
-- [MVP_SCOPE_CHECKLIST.md](../MVP_SCOPE_CHECKLIST.md)
+1. Verify the deployed digest/revision metadata.
+2. Check liveness/readiness.
+3. Verify a protected endpoint rejects missing auth with standard JSON.
+4. Use a controlled test identity for a minimal authenticated request when allowed.
+5. Do not make an unbounded real AI call merely to prove process health.

@@ -1,63 +1,54 @@
-# Starter Mobile - Agent Context
+# Starter Mobile Agent Context
 
-## What is this?
+## Purpose
 
-A generic Expo mobile starter kit. Thin authenticated client over the starter-backend API. Fork and customize screens and features per product.
+This is a generic Expo client template. Keep it a thin authenticated client over a versioned backend contract. Product screens, branding, analytics, payments, files, notifications, and offline sync are extensions.
 
-## Core Technology Stack
+## Status
 
-- **Framework**: Expo SDK 54, React Native, React 19
-- **Navigation**: expo-router (file-based)
-- **Auth**: Firebase Authentication
-- **Server state**: TanStack Query
-- **API**: Typed REST client with Bearer token injection
-- **CI/CD**: GitHub Actions + EAS Build/Submit
+The code is a functional prototype still tracked by a parent workspace repository. Target v1 is an independent repository with its own workflows, pinned backend contract, durable auth persistence, deterministic tests, validated environments, and correct preview/store release flows. Read `docs/README.md` and `docs/mobile_mvp_scope_checklist.md` before claiming completion.
 
-## Architecture Principles
+## Stack
 
-1. **Backend is source of truth** — never trust local state for user data or AI responses
-2. **Ports and adapters** — abstract Firebase and HTTP behind interfaces
-3. **Simple MVP** — login, home (me + health), chat only in starter
-4. **Security by default** — Bearer tokens, no backend secrets in app binary
+- Expo/React Native/TypeScript (use the exact SDK pinned in `package.json`)
+- Expo Router
+- Firebase Authentication
+- TanStack Query
+- Typed HTTP adapter
+- EAS Build/Submit and optional EAS Update
 
-## Project Structure (planned)
+## Boundaries
 
-```
-app/
-  (auth)/login.tsx
-  (tabs)/
-    index.tsx       # Home: /api/me + health
-    chat.tsx        # AI chat
-  _layout.tsx       # Auth gate + providers
-
-src/
-  config/env.ts
-  ports/            # AuthPort, ApiPort
-  adapters/         # FirebaseAuthAdapter, HttpApiClient
-  features/
-    auth/
-    profile/
-    chat/
+```text
+app routes -> feature hooks/components -> ports -> adapters
+                                      -> TanStack Query
 ```
 
-## Environment
+- Routes compose UI; feature behavior stays under `src/features/`.
+- Firebase and HTTP details stay in adapters.
+- Backend is authoritative for authorization, user data, business rules, and AI.
+- Client integration uses the pinned OpenAPI contract, not backend source files.
 
-- `APP_ENV=development` → DEV API + DEV Firebase
-- `APP_ENV=production` → PROD API + PROD Firebase
+## Security and configuration rules
 
-Config via `app.config.ts` + `expo-constants` (planned).
+1. Every protected request carries a Firebase ID token.
+2. On `401`, force-refresh once, retry once, then sign out; avoid concurrent refresh storms.
+3. Clear protected query data on user change/sign-out.
+4. Production build rejects DEV/localhost/missing config.
+5. Never place server secrets in `EXPO_PUBLIC_*` or the app bundle.
+6. Never log tokens, prompts/replies, or sensitive payloads.
 
-## Rules for Agents
+## Build rule
 
-1. Use [Expo SDK 54 docs](https://docs.expo.dev/versions/v54.0.0/) for all Expo APIs
-2. Screens in `app/`; business logic in `src/features/`
-3. Every protected API call includes `Authorization: Bearer <token>`
-4. On 401: refresh token once → retry → sign out
-5. Keep MVP minimal — add features in `src/features/`, don't bloat starter
+- `preview`: DEV config and internal distribution; not store-promotable.
+- `production`: PROD config and store signing; test via TestFlight/Play internal, then release the same binary.
 
-## Documentation
+## Verification
 
-- Architecture: `docs/mobile_architecture_plan.md`
-- Backend integration: `docs/BACKEND_INTEGRATION.md`
-- CI/CD: `docs/mobile_cicd_deployment_plan.md`
-- New app workflow: `../docs/NEW_APP_WORKFLOW.md`
+```bash
+npm ci
+npm run lint
+npx tsc --noEmit
+```
+
+Use the exact versioned Expo documentation for the SDK in `package.json`.

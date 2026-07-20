@@ -1,78 +1,70 @@
 # Starter Mobile
 
-Generic Expo SDK 54 client boilerplate for mobile-first products. Connects to the [starter-backend](../starter-backend/) API with Firebase Authentication.
+Reusable Expo/React Native client foundation for new applications. It provides Firebase sign-in, an authenticated HTTP client, server-state management, environment validation, a small home screen, and a minimal AI interaction.
 
-## Quick start
+> Status: functional prototype. TypeScript passes, but the independent repository split, durable React Native auth persistence, versioned contract integration, clean-install lint verification, environment guardrails, tests, and corrected store-release workflow are still required before template v1.
 
-**New to the project?** Start with the step-by-step run guides: [run/README.md](./run/README.md)
+## Prototype quick start
 
 ```bash
-cd starter-mobile
 cp .env.example .env
-# Fill in API_BASE_URL_DEV and EXPO_PUBLIC_FIREBASE_* values
-npm install
+npm ci
 npx expo start
 ```
 
-For physical devices, use your machine's LAN IP instead of `localhost` for `API_BASE_URL_DEV` when testing against a local backend.
+Configure the DEV backend URL and matching Firebase DEV project. A physical device cannot reach a backend at the computer's `localhost`; use an HTTPS DEV service or a deliberate local network/tunnel setup.
 
-## Minimal screens
-
-| Screen | Backend |
-|--------|---------|
-| Login | Firebase Auth (email/password) |
-| Home | `GET /api/me`, `GET /actuator/health` |
-| Chat | `POST /api/chat` |
-
-## Environment variables
-
-Set in `.env` for local dev or via EAS env vars for builds. See [`.env.example`](./.env.example) and [../docs/ENVIRONMENT_MATRIX.md](../docs/ENVIRONMENT_MATRIX.md).
-
-| Variable | Purpose |
-|----------|---------|
-| `APP_ENV` | `development` or `production` |
-| `API_BASE_URL_DEV` | DEV Cloud Run URL (defaults to `http://localhost:8080`) |
-| `API_BASE_URL_PROD` | PROD Cloud Run URL |
-| `EXPO_PUBLIC_FIREBASE_*` | Firebase web config for the matching environment |
-
-**Rule:** DEV builds must never default to the PROD API URL.
-
-## Project structure
+## Starter loop
 
 ```text
-app/                    # expo-router screens
-  (auth)/login.tsx
-  (tabs)/index.tsx      # Home
-  (tabs)/chat.tsx       # AI chat
-src/
-  config/env.ts         # Runtime config from app.config.ts
-  ports/                # AuthPort, ApiPort
-  adapters/             # FirebaseAuthAdapter, HttpApiClient
-  features/             # auth, profile, chat hooks
+Firebase sign-in -> authenticated /me -> stateless AI request -> sign out
 ```
 
-## CI/CD
+The backend is the source of truth for identity-derived user data, authorization, AI execution, and product rules. No server credential is included in the mobile bundle.
 
-| Workflow | Trigger |
-|----------|---------|
-| `ci-mobile.yml` | PR + push to `main` — lint + typecheck |
-| `eas-build-dev.yml` | Push to `main` — EAS preview build |
-| `eas-submit-prod.yml` | Manual — submit tested build to stores |
+## Architecture
 
-Requires `EXPO_TOKEN` GitHub secret and EAS env vars. See [docs/mobile_cicd_deployment_plan.md](./docs/mobile_cicd_deployment_plan.md).
+```text
+app routes -> feature hooks/components -> ports -> Firebase/HTTP adapters
+                                      -> TanStack Query
+```
 
-## Creating a new app
+| Area | Responsibility |
+|---|---|
+| `app/` | Expo Router routes and composition |
+| `src/features/` | Feature behavior and UI-facing hooks |
+| `src/ports/` | Auth/API capabilities used by features |
+| `src/adapters/` | Firebase and HTTP implementation details |
+| `src/config/` | Validated build/runtime configuration |
 
-Follow the monorepo guide: [../docs/NEW_APP_WORKFLOW.md](../docs/NEW_APP_WORKFLOW.md).
+## Build types
 
-## Tech stack
+| Build | Configuration | Distribution |
+|---|---|---|
+| Development client | DEV/local | Developers |
+| Preview | DEV | EAS internal distribution |
+| Production release candidate | PROD | TestFlight / Play internal testing, then store release |
 
-- Expo SDK 54, React Native, TypeScript
-- expo-router (file-based navigation)
-- Firebase JS SDK (Authentication)
-- TanStack Query (server state)
-- EAS Build / Submit for CI/CD
+A preview/internal binary is not the production store artifact.
+
+## Verify
+
+```bash
+npm ci
+npm run lint
+npx tsc --noEmit
+```
+
+Target v1 also has unit/component tests, Expo Doctor, contract validation, and clean EAS build checks.
 
 ## Documentation
 
-See [docs/README.md](./docs/README.md).
+Start with [docs/README.md](./docs/README.md), then read:
+
+- [Architecture](./docs/mobile_architecture_plan.md)
+- [Backend contract integration](./docs/BACKEND_INTEGRATION.md)
+- [CI/CD and store release](./docs/mobile_cicd_deployment_plan.md)
+- [Scope and readiness](./docs/mobile_mvp_scope_checklist.md)
+- [Implementation plan](./docs/mobile_ui_integration_plan.md)
+
+The backend is a separate repository. This client depends only on a published API contract and environment URL.

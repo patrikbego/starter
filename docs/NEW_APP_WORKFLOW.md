@@ -1,248 +1,181 @@
 # New App Workflow
 
-Step-by-step guide to fork the starter kit into a new product. Replace placeholders consistently:
+Use this process after the backend and mobile templates have independent repositories and tagged releases. Creating a product from arbitrary `main` branches is intentionally unsupported.
 
-| Placeholder | Example | Description |
-|-------------|---------|-------------|
-| `{app}` | `myvault` | Short slug (lowercase, no spaces) |
-| `{App}` | `MyVault` | Display name |
-| `com.starter` | `com.myvault` | Java package / Android package |
-| `starter-dev` | `myvault-dev` | GCP + Firebase DEV project |
-| `starter-prod` | `myvault-prod` | GCP + Firebase PROD project |
+## Inputs to decide first
+
+| Input | Example | Rule |
+|---|---|---|
+| App slug | `myvault` | Lowercase; stable across cloud resources |
+| Display name | `MyVault` | User-facing; can change later |
+| Java base package | `com.example.myvault` | Reverse-domain namespace |
+| iOS bundle ID | `com.example.myvault` | Unique and immutable after store release |
+| Android application ID | `com.example.myvault` | Unique and immutable after store release |
+| Backend template tag | `v1.0.0` | Record in product docs |
+| Mobile template tag | `v1.0.0` | Must support the backend contract version |
+| GCP region/data residency | `europe-west2` / chosen Firestore location | Choose before data exists |
 
 ## Prerequisites
 
-- [ ] Google Cloud organization or billing account with project creation rights
-- [ ] Firebase console access (linked to GCP projects)
-- [ ] GitHub account with repo creation rights
-- [ ] Expo account with EAS access
-- [ ] OpenRouter account (for AI features)
-- [ ] Apple Developer + Google Play Console (when ready for store submit)
+- GitHub organization with permission to create and protect repositories
+- Google Cloud billing/project permissions
+- Firebase access
+- Expo/EAS account
+- Apple Developer and Google Play accounts before store delivery
+- AI provider account with separate DEV and PROD limits/keys
 
-## Phase 1: Create repository
+## 1. Create two product repositories
 
-### 1.1 Fork or copy the monorepo
-
-```bash
-# Option A: GitHub fork (recommended)
-# Fork patrikbego/starter → {app} (or {app}-monorepo)
-
-# Option B: Local copy
-cp -r ~/develop/starter ~/develop/{app}
-cd ~/develop/{app}
-git remote set-url origin git@github.com:YOU/{app}.git
-```
-
-You keep the monorepo structure:
+Create from tagged template releases or GitHub template repositories:
 
 ```text
-{app}/
-├── docs/
-├── starter-backend/    # rename package folder if desired: {app}-backend/
-└── starter-mobile/     # rename package folder if desired: {app}-mobile/
+myvault-backend   <- starter-backend release vX.Y.Z
+myvault-mobile    <- starter-mobile release vA.B.C
 ```
 
-### 1.2 Rename checklist
+In each product README, record:
 
-Apply these search-replace targets across the **entire monorepo** (`docs/`, `starter-backend/`, `starter-mobile/`):
-
-| Find | Replace with |
-|------|--------------|
-| `starter` | `{app}` |
-| `Starter` | `{App}` |
-| `com.starter` | `com.{app}` |
-| `starter-dev` | `{app}-dev` |
-| `starter-prod` | `{app}-prod` |
-| `starter-api-dev` | `{app}-api-dev` |
-| `starter-api-prod` | `{app}-api-prod` |
-| `starter-api@` | `{app}-api@` |
-| `STARTER_CORS` | `{APP}_CORS` (e.g. `MYVAULT_CORS`) |
-
-Files to update (after code exists):
-
-- Backend (`starter-backend/`): `pom.xml`, `application*.yml`, `Dockerfile`, Java package directories
-- Mobile (`starter-mobile/`): `app.json`, `app.config.ts`, `eas.json`, bundle identifier, Android package name
-- Root: `.github/workflows/*` (path-filtered per package)
-
-## Phase 2: GCP bootstrap
-
-Repeat for **DEV** (`{app}-dev`) and **PROD** (`{app}-prod`).
-
-### 2.1 Create GCP project
-
-```bash
-gcloud projects create {app}-dev --name="{App} DEV"
-gcloud billing projects link {app}-dev --billing-account=YOUR_BILLING_ACCOUNT
+```text
+Created from starter-backend vX.Y.Z
+Created from starter-mobile vA.B.C
+Supported API contract: v1
 ```
 
-### 2.2 Enable APIs and create resources
+Do not copy the parent `starter` workspace and do not preserve sibling-relative links.
 
-Follow [starter-backend/scripts/COMMON_GCP_SETUP.md](../starter-backend/scripts/COMMON_GCP_SETUP.md) for each project:
+## 2. Rename and validate
 
-- Enable APIs (Firestore, Cloud Run, Artifact Registry, Secret Manager, IAM Credentials)
-- Create Firestore database (native mode, `eur3`)
-- Create service account `{app}-api`
-- Create Artifact Registry repository
-- Configure Workload Identity Federation for GitHub Actions
+Backend checklist:
 
-**Note:** Storage bucket creation is optional for the starter MVP. Add when you implement file upload — see `docs/STORAGE_EXTENSION.md`.
+- [ ] Maven coordinates, application name, Java package, and source directory
+- [ ] Configuration prefix such as `myvault.*`
+- [ ] Cloud Run service and runtime service account names
+- [ ] OpenAPI title/server examples; retain `/api/v1` compatibility
+- [ ] Logging namespace and test packages
 
-### 2.3 Create secrets
+Mobile checklist:
 
-```bash
-gcloud config set project {app}-dev
+- [ ] npm package, Expo name/slug, URL scheme
+- [ ] iOS bundle ID and Android application ID
+- [ ] EAS project ID
+- [ ] Icons, splash screen, app name, colors, and legal URLs
+- [ ] Backend contract pin and generated/validated types
 
-echo -n "sk-or-v1-YOUR_KEY" | gcloud secrets create openai-api-key --data-file=-
-echo -n "your-actuator-password" | gcloud secrets create actuator-password --data-file=-
+Run a repository-wide search for `starter`, `com.starter`, and placeholder values. Review every match; do not blindly replace prose or dependency names.
+
+## 3. Provision DEV and PROD
+
+Use the backend repository's versioned infrastructure code. Provision each environment separately:
+
+- GCP/Firebase project
+- Required APIs
+- Firestore and indexes
+- Cloud Run service identity
+- Artifact Registry access
+- Secret Manager secrets and IAM bindings
+- GitHub Workload Identity Federation
+- Budgets, logs, alerts, and retention policy
+
+Never point a local or DEV identity at production resources during bootstrap.
+
+## 4. Configure Firebase
+
+For both `{app}-dev` and `{app}-prod`:
+
+1. Link Firebase to the corresponding GCP project.
+2. Enable only required sign-in providers.
+3. Register iOS, Android, and web configurations as needed.
+4. Configure authorized domains, email templates, and password policy.
+5. Place public client configuration in the matching EAS environment.
+6. Verify backend Admin SDK credentials resolve to the same project.
+
+## 5. Configure backend delivery
+
+In the backend GitHub repository:
+
+1. Add DEV and protected PROD environments.
+2. Configure OIDC/WIF identities; do not upload service-account JSON keys.
+3. Set non-secret environment variables for project, region, service, and registry.
+4. Store runtime provider keys and admin credentials in Secret Manager.
+5. Require CI before merge and before deployment.
+6. Configure production approval and prevent self-approval where the GitHub plan supports it.
+
+First deployment sequence:
+
+```text
+merge -> tests -> build image -> capture digest -> deploy DEV digest -> smoke test
+manual approval -> deploy the same digest to PROD -> smoke test
 ```
 
-Repeat for `{app}-prod` with production values.
+## 6. Configure mobile delivery
 
-## Phase 3: Firebase setup
+In the mobile GitHub repository:
 
-For each GCP project (`{app}-dev`, `{app}-prod`):
+1. Create/link the EAS project.
+2. Configure `development`, `preview`, and `production` build profiles.
+3. Store DEV and PROD public configuration in matching EAS environments.
+4. Add `EXPO_TOKEN` and protect store-submission workflows.
+5. Configure separate app variants if DEV and PROD builds must coexist on devices.
+6. Configure runtime-version/update channels if using EAS Update.
 
-1. Open [Firebase Console](https://console.firebase.google.com/) → Add project → select existing GCP project
-2. Enable **Authentication** → Email/Password (add social providers as needed)
-3. Register apps:
-   - **iOS:** download `GoogleService-Info.plist`
-   - **Android:** download `google-services.json`
-4. Note the web API key and auth domain for mobile `app.config.ts`
+Artifact rule:
 
-Firebase project ID should match GCP project ID (`{app}-dev` / `{app}-prod`).
+- Preview builds use DEV config and support rapid internal QA.
+- Production store builds use PROD config and store signing.
+- Test the store build through TestFlight/Play internal testing, then release that same store binary.
+- Never submit a DEV/internal preview artifact as production.
 
-## Phase 4: Configure CI/CD
+## 7. Verify the starter loop
 
-All workflows live at the **monorepo root** in `.github/workflows/` (when implemented). Use path filters so backend and mobile deploy independently:
+From clean checkouts and a real device:
 
-```yaml
-# Example: backend deploy only when starter-backend/ changes
-on:
-  push:
-    paths:
-      - 'starter-backend/**'
-```
+1. Backend CI passes.
+2. DEV backend readiness is healthy.
+3. DEV mobile build signs in to DEV Firebase.
+4. `GET /api/v1/me` creates/returns only that authenticated user's record.
+5. `POST /api/v1/ai/chat` returns a bounded, stateless response.
+6. Invalid/expired tokens return the standard `401` error and the client retries once.
+7. AI quotas and error paths are visible without logging prompt content.
+8. Production deployment and store release remain approval-gated.
 
-### 4.1 Backend GitHub Actions
+## 8. Add product logic
 
-Set **repository** secrets (single monorepo on GitHub):
+Backend additions go through domain/application/port boundaries. Mobile additions go under feature modules and consume the API contract. Avoid editing platform code until the product requirement genuinely changes it.
 
-| Secret | Value |
-|--------|-------|
-| `WIF_PROVIDER` | From WIF setup in COMMON_GCP_SETUP |
-| `WIF_SERVICE_ACCOUNT` | `github-actions@{app}-dev.iam.gserviceaccount.com` |
+For every new domain resource:
 
-Update workflow files (when implemented) with:
+- scope reads/writes by authenticated user or tenant;
+- document lifecycle, retention, and deletion;
+- add contract and authorization tests;
+- add metrics without sensitive payloads;
+- decide idempotency and retry behavior;
+- update the OpenAPI contract before mobile integration.
 
-- `GCP_PROJECT_ID`: `{app}-dev` / `{app}-prod`
-- Cloud Run service name: `{app}-api-dev` / `{app}-api-prod`
-- Region: `europe-west2`
+## 9. Release and rollback record
 
-### 4.2 Mobile GitHub Actions
+Record at minimum:
 
-Set repository secret on the same monorepo:
+| Backend | Mobile |
+|---|---|
+| Git commit and image digest | Git commit and EAS build ID |
+| Cloud Run revision | iOS/Android version and build number |
+| Database/contract version | Supported backend contract version |
+| Approver and timestamp | Store track, approver, and timestamp |
 
-| Secret | Value |
-|--------|-------|
-| `EXPO_TOKEN` | From [expo.dev/settings/access-tokens](https://expo.dev/settings/access-tokens) |
+## Common failures
 
-Create a new EAS project for `{app}-mobile` (or update `extra.eas.projectId` in app config).
+| Symptom | Likely cause |
+|---|---|
+| `401` from `/me` | Mobile and backend use different Firebase projects |
+| App build starts with missing config | `app.config.ts` validation is incomplete |
+| AI call returns `502` | Provider secret, timeout, quota, or provider outage |
+| DEV deploy occurs despite failed tests | Deployment workflow is not dependent on CI |
+| PROD differs from DEV | Workflow rebuilt a tag instead of promoting a digest |
+| Store submission rejects build | Internal preview artifact used instead of store build |
 
-Set EAS environment variables per profile:
+## Related documents
 
-| Variable | DEV | PROD |
-|----------|-----|------|
-| `API_BASE_URL_DEV` | DEV Cloud Run URL | — |
-| `API_BASE_URL_PROD` | — | PROD Cloud Run URL |
-| Firebase public keys | DEV values | PROD values |
-
-## Phase 5: First deploy
-
-### 5.1 Backend DEV
-
-```bash
-# After code + workflows exist:
-git push origin main
-# GitHub Actions deploys to Cloud Run DEV
-```
-
-Verify:
-
-```bash
-curl https://{app}-api-dev-XXXX.europe-west2.run.app/actuator/health
-# Expect: {"status":"UP"}
-```
-
-### 5.2 Mobile DEV
-
-```bash
-# Trigger EAS build (after eas.json exists)
-eas build --profile preview --platform all
-```
-
-Install on device, sign in, confirm:
-
-- Home shows user from `GET /api/me`
-- Chat sends message and receives AI reply from `POST /api/chat`
-
-### 5.3 PROD promote
-
-Only after DEV validation:
-
-1. **Backend:** Run manual `deploy-prod` workflow (same Docker image tag as DEV)
-2. **Mobile:** Run manual `eas-submit-prod` workflow with the **same EAS build ID** tested in DEV
-
-Record for each release: commit SHA, image tag / build ID, submitter, timestamp.
-
-## Phase 6: Customize domain logic
-
-Keep infra stable; add product features in these locations:
-
-### Backend
-
-| Layer | Add here |
-|-------|----------|
-| Domain models | `domain/` — new entities |
-| Ports | `ports/` — new interfaces |
-| Adapters | `adapters/` — Firestore, external APIs |
-| Business logic | `application/` — new services |
-| REST API | `api/` — new controllers |
-
-Do **not** change: `SecurityConfig` auth flow, profile structure, CI/CD workflows (unless adding new secrets).
-
-### Mobile
-
-| Layer | Add here |
-|-------|----------|
-| Screens | `app/` — new routes |
-| Feature logic | `src/features/{feature}/` |
-| API calls | `src/adapters/` or feature hooks |
-| Ports | `src/ports/` — new interfaces |
-
-Do **not** change: auth gate pattern, env config structure, EAS profile names.
-
-## Phase 7: Optional extensions
-
-| Need | Action |
-|------|--------|
-| File uploads | Implement `STORAGE_EXTENSION.md`, add GCS bucket in GCP setup |
-| Subscriptions | Add RevenueCat (see docsera reference), webhook endpoint |
-| Background jobs | Add Cloud Tasks + worker endpoints |
-| Search / RAG | Add embedding port, vector search, chat context |
-
-## Troubleshooting
-
-| Symptom | Check |
-|---------|-------|
-| 401 on `/api/me` | Firebase project mismatch between mobile and backend |
-| CORS errors | `STARTER_CORS_ALLOWED_ORIGINS` / `{APP}_CORS_ALLOWED_ORIGINS` on backend |
-| AI chat fails | `openai-api-key` secret in Secret Manager; OpenRouter credits |
-| Mobile can't reach API | `API_BASE_URL_*` in EAS env; Cloud Run URL correct |
-| Firestore permission denied | Service account has `roles/datastore.user` |
-
-## Related docs
-
-- [ENVIRONMENT_MATRIX.md](./ENVIRONMENT_MATRIX.md) — full variable reference
-- [ARCHITECTURE_OVERVIEW.md](./ARCHITECTURE_OVERVIEW.md) — system design
-- [starter-backend/docs/cicd_deployment_plan.md](../starter-backend/docs/cicd_deployment_plan.md) — backend deploy detail
-- [starter-mobile/docs/mobile_cicd_deployment_plan.md](../starter-mobile/docs/mobile_cicd_deployment_plan.md) — mobile deploy detail
+- [Repository strategy](./REPOSITORY_STRATEGY.md)
+- [Environment matrix](./ENVIRONMENT_MATRIX.md)
+- [Implementation roadmap](./IMPLEMENTATION_ROADMAP.md)
+- [Project review](./REVIEW_FINDINGS.md)
