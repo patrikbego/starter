@@ -1,8 +1,8 @@
 # Mobile UI Integration Plan
 
-Task checklist for wiring the starter mobile app to the backend. Expand per task during implementation.
+Task checklist for wiring the starter mobile app to the backend.
 
-**Status:** Docs phase — tasks planned.
+**Status:** MVP implemented.
 
 ---
 
@@ -10,11 +10,11 @@ Task checklist for wiring the starter mobile app to the backend. Expand per task
 
 | # | Task | Backend dependency | Status |
 |---|------|-------------------|--------|
-| 1.1 | Create Expo project with expo-router, TypeScript | — | Planned |
-| 1.2 | Add `app.config.ts` with `apiBaseUrl`, `appEnv`, Firebase extra | — | Planned |
-| 1.3 | Add TanStack Query, Firebase SDK dependencies | — | Planned |
-| 1.4 | Configure `src/config/env.ts` reading from Constants | — | Planned |
-| 1.5 | Set up eslint + `tsc --noEmit` in CI | — | Planned |
+| 1.1 | Create Expo project with expo-router, TypeScript | — | Implemented |
+| 1.2 | Add `app.config.ts` with `apiBaseUrl`, `appEnv`, Firebase extra | — | Implemented |
+| 1.3 | Add TanStack Query, Firebase SDK dependencies | — | Implemented |
+| 1.4 | Configure `src/config/env.ts` reading from Constants | — | Implemented |
+| 1.5 | Set up eslint + `tsc --noEmit` in CI | — | Implemented |
 
 ---
 
@@ -22,12 +22,12 @@ Task checklist for wiring the starter mobile app to the backend. Expand per task
 
 | # | Task | Backend dependency | Status |
 |---|------|-------------------|--------|
-| 2.1 | Define `AuthPort` interface | — | Planned |
-| 2.2 | Implement `FirebaseAuthAdapter` | Firebase DEV project | Planned |
-| 2.3 | Create `AuthProvider` context | — | Planned |
-| 2.4 | Build login screen (email/password) | Firebase Auth enabled | Planned |
-| 2.5 | Auth gate in `app/_layout.tsx` | — | Planned |
-| 2.6 | Sign out on home screen | — | Planned |
+| 2.1 | Define `AuthPort` interface | — | Implemented |
+| 2.2 | Implement `FirebaseAuthAdapter` | Firebase DEV project | Implemented |
+| 2.3 | Create `AuthProvider` context | — | Implemented |
+| 2.4 | Build login screen (email/password) | Firebase Auth enabled | Implemented |
+| 2.5 | Auth gate in `app/_layout.tsx` | — | Implemented |
+| 2.6 | Sign out on home screen | — | Implemented |
 
 ---
 
@@ -35,10 +35,10 @@ Task checklist for wiring the starter mobile app to the backend. Expand per task
 
 | # | Task | Backend dependency | Status |
 |---|------|-------------------|--------|
-| 3.1 | Define `ApiPort` / implement `HttpApiClient` | — | Planned |
-| 3.2 | Bearer token injection | — | Planned |
-| 3.3 | 401 refresh + retry + sign-out | Backend `/api/me` returns 401 for bad token | Planned |
-| 3.4 | Error types (`ApiError`) | — | Planned |
+| 3.1 | Define `ApiPort` / implement `HttpApiClient` | — | Implemented |
+| 3.2 | Bearer token injection | — | Implemented |
+| 3.3 | 401 refresh + retry + sign-out | Backend `/api/me` returns 401 for bad token | Implemented |
+| 3.4 | Error types (`ApiError`) | — | Implemented |
 
 ---
 
@@ -46,12 +46,12 @@ Task checklist for wiring the starter mobile app to the backend. Expand per task
 
 | # | Task | Backend dependency | Status |
 |---|------|-------------------|--------|
-| 4.1 | `useMe` hook → `GET /api/me` | `GET /api/me` implemented | Planned |
-| 4.2 | Display user email, displayName | — | Planned |
-| 4.3 | `useHealth` hook → `GET /actuator/health` | Health endpoint live | Planned |
-| 4.4 | Health status badge (UP / down) | — | Planned |
-| 4.5 | Pull-to-refresh | — | Planned |
-| 4.6 | Loading and error states | — | Planned |
+| 4.1 | `useMe` hook → `GET /api/me` | `GET /api/me` implemented | Implemented |
+| 4.2 | Display user email, displayName | — | Implemented |
+| 4.3 | `useHealth` hook → `GET /actuator/health` | Health endpoint live | Implemented |
+| 4.4 | Health status badge (UP / down) | — | Implemented |
+| 4.5 | Pull-to-refresh | — | Implemented |
+| 4.6 | Loading and error states | — | Implemented |
 
 ---
 
@@ -59,12 +59,12 @@ Task checklist for wiring the starter mobile app to the backend. Expand per task
 
 | # | Task | Backend dependency | Status |
 |---|------|-------------------|--------|
-| 5.1 | Chat UI (input + message list) | — | Planned |
-| 5.2 | `useSendChat` → `POST /api/chat` | Chat endpoint implemented | Planned |
-| 5.3 | Display reply in message list | — | Planned |
-| 5.4 | Loading indicator while waiting | — | Planned |
-| 5.5 | Error handling (502, network) | — | Planned |
-| 5.6 | Optional: persist `sessionId` for multi-turn | — | Planned |
+| 5.1 | Chat UI (input + message list) | — | Implemented |
+| 5.2 | `useSendChat` → `POST /api/chat` | Chat endpoint implemented | Implemented |
+| 5.3 | Display reply in message list | — | Implemented |
+| 5.4 | Loading indicator while waiting | — | Implemented |
+| 5.5 | Error handling (502, network) | — | Implemented |
+| 5.6 | Optional: persist `sessionId` for multi-turn | — | Implemented |
 
 ---
 
@@ -72,12 +72,12 @@ Task checklist for wiring the starter mobile app to the backend. Expand per task
 
 | # | Task | Backend dependency | Status |
 |---|------|-------------------|--------|
-| 6.1 | Create `eas.json` profiles | — | Planned |
-| 6.2 | Set EAS env vars (`API_BASE_URL_DEV`, Firebase keys) | DEV Cloud Run URL known | Planned |
-| 6.3 | GitHub Actions `ci.yml` | — | Planned |
-| 6.4 | GitHub Actions `eas-build-dev.yml` | — | Planned |
-| 6.5 | Manual `eas-submit-prod.yml` | PROD backend deployed | Planned |
-| 6.6 | End-to-end test on DEV build | Backend DEV live | Planned |
+| 6.1 | Create `eas.json` profiles | — | Implemented |
+| 6.2 | Set EAS env vars (`API_BASE_URL_DEV`, Firebase keys) | DEV Cloud Run URL known | Pending (manual setup) |
+| 6.3 | GitHub Actions `ci-mobile.yml` | — | Implemented |
+| 6.4 | GitHub Actions `eas-build-dev.yml` | — | Implemented |
+| 6.5 | Manual `eas-submit-prod.yml` | PROD backend deployed | Implemented |
+| 6.6 | End-to-end test on DEV build | Backend DEV live | Pending (manual verification) |
 
 ---
 

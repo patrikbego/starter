@@ -30,11 +30,11 @@ Matches backend **DEV auto / PROD manual** discipline.
 | Item | Status |
 |------|--------|
 | Documentation | Complete |
-| `eas.json` | Planned |
-| `app.config.ts` | Planned |
-| `.github/workflows/ci.yml` | Planned |
-| `.github/workflows/eas-build-dev.yml` | Planned |
-| `.github/workflows/eas-submit-prod.yml` | Planned |
+| `eas.json` | Implemented |
+| `app.config.ts` | Implemented |
+| `.github/workflows/ci-mobile.yml` | Implemented |
+| `.github/workflows/eas-build-dev.yml` | Implemented |
+| `.github/workflows/eas-submit-prod.yml` | Implemented |
 
 ---
 

@@ -2,7 +2,7 @@
 
 Minimal screens and integrations for the starter mobile app.
 
-**Status:** Docs phase — all items planned.
+**Status:** MVP implemented.
 
 ---
 
@@ -12,39 +12,39 @@ Minimal screens and integrations for the starter mobile app.
 
 | Criterion | Status |
 |-----------|--------|
-| Email/password sign-in via Firebase | Planned |
-| Show error on invalid credentials | Planned |
-| Navigate to tabs on success | Planned |
-| Link to sign-up (optional MVP) | Planned |
+| Email/password sign-in via Firebase | Implemented |
+| Show error on invalid credentials | Implemented |
+| Navigate to tabs on success | Implemented |
+| Link to sign-up (optional MVP) | Implemented |
 
 ### 1.2 Home (`app/(tabs)/index.tsx`)
 
 | Criterion | Status |
 |-----------|--------|
-| Display user email/name from `GET /api/me` | Planned |
-| Show loading state while fetching | Planned |
-| Backend health badge from `GET /actuator/health` | Planned |
-| Pull-to-refresh refetches me + health | Planned |
-| Sign out button | Planned |
+| Display user email/name from `GET /api/me` | Implemented |
+| Show loading state while fetching | Implemented |
+| Backend health badge from `GET /actuator/health` | Implemented |
+| Pull-to-refresh refetches me + health | Implemented |
+| Sign out button | Implemented |
 
 ### 1.3 Chat (`app/(tabs)/chat.tsx`)
 
 | Criterion | Status |
 |-----------|--------|
-| Text input for message | Planned |
-| Send calls `POST /api/chat` | Planned |
-| Display AI reply | Planned |
-| Show loading while waiting | Planned |
-| Show error on failure | Planned |
-| Maintain `sessionId` across messages (optional MVP) | Planned |
+| Text input for message | Implemented |
+| Send calls `POST /api/chat` | Implemented |
+| Display AI reply | Implemented |
+| Show loading while waiting | Implemented |
+| Show error on failure | Implemented |
+| Maintain `sessionId` across messages (optional MVP) | Implemented |
 
 ### 1.4 Auth gate (`app/_layout.tsx`)
 
 | Criterion | Status |
 |-----------|--------|
-| Unauthenticated users see only `(auth)` routes | Planned |
-| Authenticated users see `(tabs)` | Planned |
-| Session restored on app launch | Planned |
+| Unauthenticated users see only `(auth)` routes | Implemented |
+| Authenticated users see `(tabs)` | Implemented |
+| Session restored on app launch | Implemented |
 
 ---
 
@@ -52,15 +52,15 @@ Minimal screens and integrations for the starter mobile app.
 
 | Item | Status |
 |------|--------|
-| Expo SDK 54 project | Planned |
-| TypeScript strict | Planned |
-| `app.config.ts` with `apiBaseUrl` | Planned |
-| Firebase Auth adapter | Planned |
-| HttpApiClient with Bearer injection | Planned |
-| TanStack Query provider | Planned |
-| `eas.json` | Planned |
-| GitHub Actions `ci.yml` | Planned |
-| GitHub Actions `eas-build-dev.yml` | Planned |
+| Expo SDK 54 project | Implemented |
+| TypeScript strict | Implemented |
+| `app.config.ts` with `apiBaseUrl` | Implemented |
+| Firebase Auth adapter | Implemented |
+| HttpApiClient with Bearer injection | Implemented |
+| TanStack Query provider | Implemented |
+| `eas.json` | Implemented |
+| GitHub Actions `ci-mobile.yml` | Implemented |
+| GitHub Actions `eas-build-dev.yml` | Implemented |
 
 ---
 
