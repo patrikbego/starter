@@ -4,7 +4,7 @@ Generic Spring Boot API boilerplate for mobile-first products. Deployed on Googl
 
 ## Quick start
 
-**Requires Java 21+** (JDK 23 is supported for builds after explicit Lombok processor config in `pom.xml`).
+**New to the project?** Start with the step-by-step run guides: [run/README.md](./run/README.md)
 
 ### Local offline development (mocks)
 
