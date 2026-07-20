@@ -4,6 +4,8 @@ Generic Expo SDK 54 client boilerplate for mobile-first products. Connects to th
 
 ## Quick start
 
+**New to the project?** Start with the step-by-step run guides: [run/README.md](./run/README.md)
+
 ```bash
 cd starter-mobile
 cp .env.example .env
