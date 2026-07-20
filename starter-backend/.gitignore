@@ -1,0 +1,23 @@
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# Secrets
+*.json
+!mvnw.json
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+
+# GCP keys
+.gcp/
+*-sa.json
