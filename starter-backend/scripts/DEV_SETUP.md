@@ -1,63 +1,39 @@
-# DEV Environment Setup
+# DEV Environment Bootstrap
 
-One-time setup for the `starter-dev` GCP project and Cloud Run DEV deployment.
+Target v1 provisions DEV through versioned infrastructure code in this backend repository. The commands/resources below are the required outcome, not a substitute for idempotent automation.
 
-## Prerequisites
+## DEV resources
 
-- GCP billing enabled
-- `gcloud` CLI authenticated
-- GitHub monorepo (`starter` — contains `starter-backend/` and `starter-mobile/`)
+- `{app}-dev` GCP project with billing/budgets
+- linked Firebase project and required sign-in providers
+- Firestore in the chosen immutable data location
+- Cloud Run service and least-privilege runtime service account
+- private release Artifact Registry access
+- Secret Manager entries for DEV provider/admin secrets
+- GitHub OIDC/WIF deploy identity restricted to this backend repository
+- logs, error/latency alerts, and explicit cost caps
 
-## Steps
+## Repository configuration
 
-### 1. Create GCP project
+Configure a GitHub `development` environment with non-secret variables for project, region, service, runtime identity, and artifact image. Configure WIF identifiers as protected environment/repository values.
 
-```bash
-gcloud projects create starter-dev --name="Starter DEV"
-gcloud billing projects link starter-dev --billing-account=YOUR_BILLING_ACCOUNT
+The target deployment chain is:
+
+```text
+verify -> build -> capture digest -> deploy DEV digest -> smoke test
 ```
 
-### 2. Run common GCP setup
+Do not run deploy in parallel with CI or use long-lived service-account JSON in GitHub.
 
-Follow [COMMON_GCP_SETUP.md](./COMMON_GCP_SETUP.md) with `[PROJECT_ID]=starter-dev`.
+## Verify
 
-### 3. Configure GitHub Actions secrets
+- [ ] Active backend profile is `dev`
+- [ ] Cloud Run revision uses the recorded digest
+- [ ] Runtime identity has DEV-only data/secret access
+- [ ] Liveness/readiness succeed
+- [ ] Protected endpoint rejects missing token
+- [ ] DEV Firebase token reaches `/me`
+- [ ] AI key has a low environment budget and no prompt logging
+- [ ] DEV mobile preview uses this URL and the same Firebase project
 
-In the **starter monorepo** GitHub repository (root `.github/workflows/`):
-
-| Secret | Value |
-|--------|-------|
-| `WIF_PROVIDER` | From WIF setup |
-| `WIF_SERVICE_ACCOUNT` | `github-actions@starter-dev.iam.gserviceaccount.com` |
-| `GCP_PROJECT_ID` | `starter-dev` |
-
-### 4. First deployment
-
-After application code and `deploy-dev.yml` exist:
-
-```bash
-git push origin main
-```
-
-Verify:
-
-```bash
-curl https://starter-api-dev-XXXX.europe-west2.run.app/actuator/health
-```
-
-### 5. Note Cloud Run URL
-
-Record the DEV API URL for mobile `API_BASE_URL_DEV` in EAS environment variables.
-
-## DEV characteristics
-
-- Auto-deploy on merge to `main`
-- CORS may allow `*`
-- Test/synthetic data acceptable
-- OpenRouter uses same key as local (monitor usage)
-
-## Related docs
-
-- [PROD_SETUP.md](./PROD_SETUP.md)
-- [DEV_LOCAL_SETUP.md](./DEV_LOCAL_SETUP.md)
-- [../docs/cicd_deployment_plan.md](../docs/cicd_deployment_plan.md)
+See [COMMON_GCP_SETUP.md](./COMMON_GCP_SETUP.md) for the resource/IAM blueprint and [CI/CD](../docs/cicd_deployment_plan.md) for workflow requirements.

@@ -1,59 +1,21 @@
-# Starter Mobile Documentation
+# Mobile Documentation
 
-Planning and architecture docs for the starter mobile client (Expo SDK 54). Connects to the [starter-backend](../starter-backend/) Spring Boot API on Google Cloud Run.
+This directory is self-contained within the mobile repository.
 
-## Mobile docs (`starter-mobile/docs/`)
+| Document | Purpose |
+|---|---|
+| [mobile_architecture_plan.md](./mobile_architecture_plan.md) | Target client boundaries, state, auth, configuration, and extension rules |
+| [BACKEND_INTEGRATION.md](./BACKEND_INTEGRATION.md) | Versioned API contract, token behavior, errors, and compatibility |
+| [mobile_cicd_deployment_plan.md](./mobile_cicd_deployment_plan.md) | Independent CI, preview builds, store release candidates, OTA, and rollback |
+| [mobile_mvp_scope_checklist.md](./mobile_mvp_scope_checklist.md) | Prototype status and template-v1 exit criteria |
+| [mobile_ui_integration_plan.md](./mobile_ui_integration_plan.md) | Ordered implementation work |
 
-| Document | Description |
-|----------|-------------|
-| [mobile_architecture_plan.md](./mobile_architecture_plan.md) | Client architecture, ports/adapters, flows, build phases |
-| [mobile_cicd_deployment_plan.md](./mobile_cicd_deployment_plan.md) | EAS Build/Submit, GitHub Actions, DEV/PROD environments |
-| [mobile_mvp_scope_checklist.md](./mobile_mvp_scope_checklist.md) | MVP screens, acceptance criteria, phased delivery |
-| [BACKEND_INTEGRATION.md](./BACKEND_INTEGRATION.md) | API client, auth header, error handling, endpoint mapping |
-| [mobile_ui_integration_plan.md](./mobile_ui_integration_plan.md) | Task list for wiring auth → me → chat |
+## Documentation labels
 
-## Backend docs (starter-backend repo)
+- **Prototype** means code present today.
+- **Target v1** means required before this repository should be used as a production template.
+- **Extension** means product-specific and excluded from starter core.
 
-| Document | Path in starter-backend |
-|----------|-------------------------|
-| Documentation index | `docs/README.md` |
-| Backend architecture | `docs/backend_architecture_plan.md` |
-| Backend CI/CD | `docs/cicd_deployment_plan.md` |
-| Authentication | `docs/AUTHENTICATION.md` |
-| AI integration | `docs/AI_INTEGRATION.md` |
-| MVP checklist | `docs/MVP_SCOPE_CHECKLIST.md` |
+The backend is an independent repository. Cross-repository integration is described through the backend's published OpenAPI contract, not filesystem links.
 
-## Root docs (`docs/` at monorepo root)
-
-| Document | Path |
-|----------|------|
-| New app workflow | `../../docs/NEW_APP_WORKFLOW.md` |
-| Architecture overview | `../../docs/ARCHITECTURE_OVERVIEW.md` |
-| Environment matrix | `../../docs/ENVIRONMENT_MATRIX.md` |
-
-## Backend docs (`starter-backend/docs/`)
-
-## Expo
-
-Target **Expo SDK 54**. Use versioned docs: https://docs.expo.dev/versions/v54.0.0/
-
-## Quick alignment
-
-```text
-Mobile                          Backend
-------                          -------
-Firebase Auth (client)    <->   Firebase token verification
-GET /api/me               <->   User auto-provision in Firestore
-POST /api/chat            <->   Spring AI via OpenRouter
-APP_ENV / EAS profile     <->   starter-dev / starter-prod GCP projects
-```
-
-Deployment model (monorepo): **merge to `main` → DEV**; **manual approval → PROD**.
-
-## Core integration loop
-
-```text
-Sign in (Firebase) → GET /api/me (user profile) → POST /api/chat (AI reply)
-```
-
-Mobile owns sign-in UI, API client, and chat display; backend owns auth verification, persistence, and AI.
+Expo APIs must be checked against the exact SDK version pinned by `package.json`. Upgrade the SDK deliberately and update this documentation in the same change.

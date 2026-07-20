@@ -1,163 +1,161 @@
 # Architecture Overview
 
-High-level design for the starter kit: a reusable backend + mobile foundation that you fork and customize per product.
+## Goal
 
-## System diagram
+Create two small, secure templates that let a team validate a new product idea quickly without cloning product-specific Docsera behavior. The templates standardize the expensive, repetitive foundation—identity, API access, persistence, AI integration, observability, and delivery—while leaving the product domain deliberately empty.
+
+## Repository boundaries
 
 ```mermaid
-flowchart TB
-  subgraph mobile [starter-mobile]
-    ExpoApp[Expo SDK 54 App]
-    FirebaseClient[Firebase Auth Client]
-    ApiClient[Typed API Client]
-    ExpoApp --> FirebaseClient
-    ExpoApp --> ApiClient
+flowchart LR
+  subgraph mobileRepo["Repository: starter-mobile"]
+    UI["Expo UI and feature modules"]
+    AuthClient["Firebase client adapter"]
+    ApiClient["Generated types + HTTP adapter"]
   end
 
-  subgraph backend [starter-backend]
-    CloudRun[Spring Boot on Cloud Run]
-    AuthFilter[Firebase Token Filter]
-    AiPort[AI Port - Spring AI]
-    UserRepo[User Repository Port]
-    CloudRun --> AuthFilter
-    CloudRun --> AiPort
-    CloudRun --> UserRepo
+  subgraph backendRepo["Repository: starter-backend"]
+    API["Versioned REST API"]
+    App["Application services"]
+    Ports["Domain ports"]
+    Adapters["Firebase, Firestore, AI adapters"]
+    Contract["OpenAPI contract"]
   end
 
-  subgraph gcp [Google Cloud - per app]
-    Firestore[(Firestore)]
-    SecretMgr[Secret Manager]
-    ArtifactReg[Artifact Registry]
+  subgraph cloud["Environment-isolated cloud resources"]
+    Firebase["Firebase Auth"]
+    Run["Cloud Run"]
+    DB[("Firestore")]
+    Secrets["Secret Manager"]
+    Registry["Artifact Registry"]
   end
 
-  FirebaseClient -->|"Bearer ID token"| AuthFilter
-  ApiClient -->|"REST JSON"| CloudRun
-  UserRepo --> Firestore
-  AiPort -->|"OpenRouter"| OpenRouter[OpenRouter API]
-  CloudRun --> SecretMgr
+  AuthClient --> Firebase
+  ApiClient -->|"HTTPS + Firebase ID token"| API
+  Contract -.->|"validated/generated client types"| ApiClient
+  API --> App --> Ports --> Adapters
+  Run --> API
+  Adapters --> DB
+  Adapters --> Secrets
+  Adapters --> AI["AI provider"]
+  Registry --> Run
 ```
 
-## Repository layout
+The mobile app depends on the published API contract, not on backend source. The backend accepts any conforming client, not only the starter mobile app.
+
+## Core versus product code
+
+| Reusable starter core | Product-specific extension |
+|---|---|
+| Auth verification and current-user provisioning | Roles, onboarding rules, organizations |
+| Standard errors and correlation IDs | Domain errors and business policies |
+| Repository and provider ports | Product entities and external integrations |
+| Minimal stateless AI request | Prompts, tools, RAG, conversation memory |
+| Environment validation and health checks | Product configuration and feature flags |
+| CI, promotion, rollback, and release metadata | Product release cadence |
+| Expo auth gate and HTTP client | Branding, navigation, screens, analytics |
+
+The starter should not include Docsera's documents, OCR, storage, billing, subscriptions, or search. Those remain useful reference implementations.
+
+## Backend architecture
+
+Use a pragmatic ports-and-adapters structure:
 
 ```text
-starter/                    # Monorepo (single git repository)
-├── docs/                   # Cross-cutting guides
-├── starter-backend/        # Spring Boot API package
-└── starter-mobile/         # Expo mobile package
+api -> application -> domain
+             |          ^
+             v          |
+            ports <- adapters
 ```
 
-When you create a new product, **fork or copy this entire monorepo** and rename placeholders (`starter` → `{app}`) across all packages.
+- `domain/` is plain Java and contains business concepts only.
+- `application/` implements use cases and authorization decisions.
+- `ports/` defines capabilities required from infrastructure.
+- `adapters/` implements Firebase, Firestore, AI, and other providers.
+- `api/` maps HTTP input/output and never contains business rules.
+- `config/`, `security/`, `logging/`, and `health/` are platform concerns.
 
-## Architectural principles
+Cloud portability is achieved at meaningful seams. The template does not abstract Spring itself or create an interface for every class.
 
-### 1. Portable by design (ports and adapters)
+## Mobile architecture
 
-Cloud services and third-party APIs are hidden behind interfaces. The starter uses:
+Keep the mobile application thin but feature-oriented:
 
-- **Backend:** hexagonal layout (`api` → `application` → `domain` ← `ports` ← `adapters`)
-- **Mobile:** thin client with `ports/` and `adapters/` for Firebase and HTTP
+```text
+app routes -> feature hooks/components -> ports -> adapters
+                                      -> TanStack Query cache
+```
 
-This lets you swap Firestore for PostgreSQL, OpenRouter for another provider, or Firebase for another auth system without rewriting business logic.
+- `app/` owns Expo Router composition and route-level UI.
+- `src/features/` owns feature behavior and view models.
+- `src/ports/` defines auth and API capabilities used by features.
+- `src/adapters/` owns Firebase and HTTP details.
+- Server data stays in TanStack Query; transient UI state stays local.
 
-### 2. Scale-to-zero (serverless first)
+Do not reproduce backend authorization or business rules in the app. Client checks improve UX; server checks provide security.
 
-- **Backend:** Google Cloud Run (no always-on VMs or Kubernetes during MVP)
-- **Database:** Firestore (serverless, pay-per-use)
-- **Secrets:** GCP Secret Manager
+## Integration contract
 
-Avoid fixed-cost infrastructure until product-market fit is clear.
+Before template v1, the backend must publish an OpenAPI document and version routes under `/api/v1`. The minimum contract is:
 
-### 3. Thin client, backend is source of truth
+| Method | Target path | Purpose |
+|---|---|---|
+| `GET` | `/health/live` | Process liveness; no dependency details |
+| `GET` | `/health/ready` | Readiness for deployment smoke tests |
+| `GET` | `/api/v1/me` | Authenticated current user |
+| `POST` | `/api/v1/ai/chat` | Minimal authenticated, stateless AI request |
 
-The mobile app never treats local state as authoritative for:
+All errors use one schema containing `code`, `message`, and `correlationId`. The backend validates the OpenAPI file in CI; the mobile repository validates or generates its API types from a pinned contract version.
 
-- User identity (Firebase provides tokens; backend provisions the user record)
-- AI responses (all inference runs server-side)
-- Business rules (enforce on the API, not only in the client)
-
-### 4. Security by default
-
-- Every protected API call requires a valid Firebase ID token
-- No cloud service account keys on the mobile device
-- Secrets only in Secret Manager / CI secrets — never in YAML or git
-- Actuator admin endpoints protected with HTTP Basic auth
-
-### 5. Simple MVP first
-
-The starter intentionally includes only:
-
-| Endpoint | Purpose |
-|----------|---------|
-| `GET /actuator/health` | Liveness for Cloud Run and mobile reachability check |
-| `GET /api/me` | Authenticated user profile (auto-provisioned in Firestore) |
-| `POST /api/chat` | Minimal AI integration (Spring AI + OpenRouter) |
-
-Extensions (file upload, subscriptions, search, workers) are documented separately and added per product.
-
-## What is shared vs per-app
-
-| Concern | Shared (starter pattern) | Per-app (you customize) |
-|---------|--------------------------|-------------------------|
-| Hexagonal package layout | Yes | Rename `com.starter` → `com.{app}` |
-| Spring profiles (`local`, `dev-local`, `dev`, `prod`) | Yes | — |
-| CI/CD flow (main → DEV, manual → PROD) | Yes | GitHub repo + GCP project names |
-| Firebase Auth + token filter | Yes | Firebase project per env |
-| Firestore user collection | Yes | Additional collections per domain |
-| Spring AI + OpenRouter | Yes | Prompts, models, rate limits |
-| Expo + expo-router structure | Yes | Screens, branding, bundle ID |
-| GCP projects | Pattern: `{app}-dev`, `{app}-prod` | Your project IDs |
-| Domain logic | Skeleton only | `application/` + `src/features/` |
+The current prototype still uses `/actuator/health`, `/api/me`, and `/api/chat`. That is acceptable during the prototype phase, but it is not the target public contract.
 
 ## Environment model
 
-### Backend profiles
+| Environment | Backend | Mobile | External data |
+|---|---|---|---|
+| `local` | Explicit mocks/emulators only | Local Expo development | Disposable |
+| `dev-local` | Local process using DEV services | Optional local app against DEV API | Shared DEV |
+| `dev` | Cloud Run in `{app}-dev` | Preview/internal build | Shared DEV |
+| `prod` | Cloud Run in `{app}-prod` | Store-signed build | Production |
 
-| Profile | Where it runs | GCP | Firebase |
-|---------|---------------|-----|----------|
-| `local` | Developer machine | Mocks / emulators | Auth emulator |
-| `dev-local` | Developer machine (IntelliJ) | Real DEV project | Emulator or real |
-| `dev` | Cloud Run DEV | `{app}-dev` | DEV Firebase |
-| `prod` | Cloud Run PROD | `{app}-prod` | PROD Firebase |
+There is no implicit fallback from a cloud environment to `local`. A missing profile or required variable must stop startup or build.
 
-### Mobile environments
+## Security and privacy baseline
 
-| `APP_ENV` | API target | Firebase project | Distribution |
-|-----------|------------|------------------|--------------|
-| `development` | DEV Cloud Run URL | DEV | EAS internal / TestFlight internal |
-| `production` | PROD Cloud Run URL | PROD | App Store / Play Store |
+- Verify Firebase ID tokens for every protected request and derive user ownership from the verified principal.
+- Store server secrets only in Secret Manager and use Workload Identity Federation from GitHub Actions.
+- Use least-privilege service accounts per environment.
+- Rate-limit and budget AI calls per authenticated user before provider invocation.
+- Never log tokens, prompts, model responses, passwords, or sensitive domain payloads by default.
+- Restrict production CORS to actual web origins. Native apps do not need permissive CORS.
+- Keep only a minimal public liveness response; do not expose build or environment detail publicly.
+- Make production deployment approval-controlled and rollbackable.
 
-See [ENVIRONMENT_MATRIX.md](./ENVIRONMENT_MATRIX.md) for the full variable mapping.
+## Delivery model
 
-## Deployment flow
+Backend:
 
 ```text
-Developer
-  → feature branch
-  → PR + review
-  → merge to main
-      → backend: GitHub Actions → Docker → Artifact Registry → Cloud Run DEV
-      → mobile: GitHub Actions → EAS Build DEV (internal)
-  → test against DEV
-  → manual workflow
-      → backend: deploy same image tag to Cloud Run PROD
-      → mobile: EAS Submit same build ID to store tracks
+PR -> verify -> merge -> build image once -> deploy digest to DEV
+                                      -> approved deploy of same digest to PROD
 ```
 
-**Build once, promote the same artifact** — do not rebuild for PROD unless DEV failed and was fixed.
+Mobile:
 
-## Extension paths (not in starter MVP)
+```text
+PR -> lint/typecheck/test
+merge -> DEV preview build (not store-promotable)
+release tag -> store build -> TestFlight/Play internal -> release same store binary
+```
 
-Add these when your product needs them. Each has a doc stub in starter-backend:
+See the backend and mobile CI/CD documents for executable workflow requirements.
 
-| Extension | Backend doc | Typical trigger |
-|-----------|-------------|-----------------|
-| File upload (signed GCS URLs) | `docs/STORAGE_EXTENSION.md` | User-generated content |
-| Subscriptions (RevenueCat) | Architecture § Future extensions | Paid plans |
-| Async workers (Cloud Tasks) | Architecture § Future extensions | Background processing |
-| Search / RAG | Architecture § Future extensions | Document Q&A products |
+## Deliberate non-goals for template v1
 
-## Related docs
-
-- [NEW_APP_WORKFLOW.md](./NEW_APP_WORKFLOW.md) — fork and configure a new product
-- [starter-backend/docs/backend_architecture_plan.md](../starter-backend/docs/backend_architecture_plan.md) — backend detail
-- [starter-mobile/docs/mobile_architecture_plan.md](../starter-mobile/docs/mobile_architecture_plan.md) — mobile detail
+- Microservices or Kubernetes
+- A generic workflow engine
+- Multi-tenant organizations or admin portals
+- File storage, OCR, subscriptions, vector search, or RAG
+- Offline-first synchronization
+- Provider-specific AI features in domain code
+- Automatic propagation of starter changes into created product repositories

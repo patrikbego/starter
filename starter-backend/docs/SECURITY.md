@@ -1,112 +1,102 @@
-# Security
+# Security Baseline
 
-Security configuration for the starter backend API.
+## Trust boundaries
 
-## Security filter chain
+- The mobile app and every HTTP request are untrusted.
+- Firebase proves identity; it does not automatically prove resource authorization.
+- AI input/output is untrusted content.
+- Firestore and provider SDKs are infrastructure boundaries.
+- CI workflows and deployment identities are part of the production attack surface.
 
-Configured in `SecurityConfig` (planned).
+## Authentication and authorization
 
-| Path pattern | Access |
-|--------------|--------|
-| `/actuator/health`, `/actuator/info` | Public |
-| `/actuator/**` (other) | `ROLE_ADMIN` + HTTP Basic |
-| `/api/**` | Authenticated (Firebase Bearer token) |
-| All other routes | Authenticated |
+- Verify a Firebase ID token on every protected request.
+- Build the application principal only from verified claims.
+- Make an explicit policy decision for revoked tokens and disabled/suspended users.
+- Derive resource owner/tenant from the principal, never from a trusted-looking request field.
+- Query protected resources by both resource ID and owner/tenant ID.
+- Enforce business authorization in application services and test cross-user denial.
 
-## Session and CSRF
+Target public endpoints are limited to minimal liveness. Readiness and detailed diagnostics should be restricted to deployment/operations access. Public build metadata is unnecessary.
 
-- **Stateless** — `SessionCreationPolicy.STATELESS`
-- **CSRF disabled** — stateless REST API; clients use Bearer tokens
+## Fail-closed configuration
 
-## Firebase authentication
+The prototype currently defaults to the `local` profile. Target v1 removes that default.
 
-See [AUTHENTICATION.md](./AUTHENTICATION.md).
+Required tests:
 
-Filter order:
+- no active profile does not load mock authentication;
+- `dev` and `prod` cannot instantiate mock ports;
+- missing secrets/configuration stops startup;
+- production CORS cannot be wildcard;
+- production does not enable verbose security logging.
 
-1. `CorrelationIdFilter` — MDC + response header
-2. `FirebaseAuthenticationFilter` — token verification
-3. Spring Security authorization
+## HTTP baseline
 
-## Actuator protection
+- Stateless sessions; CSRF disabled only for the Bearer-token API.
+- One JSON error envelope for auth, validation, authorization, rate limits, and server failures.
+- Bounded request bodies and field lengths.
+- Explicit content types and supported methods.
+- Secure headers appropriate to API/web use.
+- Correlation ID accepted only after validation/length limits, or generated server-side.
+- CORS restricted to actual browser origins. Native clients are not made safer by `*`.
 
-Non-public actuator endpoints require HTTP Basic auth:
+## Secrets and identity
 
-- Username: `admin` (configurable)
-- Password: `${ACTUATOR_PASSWORD}` from Secret Manager
+| Item | Storage |
+|---|---|
+| AI/provider key | Secret Manager, separate per environment |
+| Runtime identity | Cloud Run service account |
+| GitHub cloud access | OIDC/WIF short-lived token |
+| Local developer access | ADC outside repository |
+| Firebase public client config | Mobile build environment; not a server secret |
 
-Never expose `/actuator/env` or `/actuator/beans` publicly in production.
+Never commit service-account JSON, API keys, tokens, actuator passwords, `.env` values, or copied production configuration.
 
-## CORS
+## Logging and privacy
 
-Configured via `STARTER_CORS_ALLOWED_ORIGINS` (rename to `{APP}_CORS_ALLOWED_ORIGINS` when forking).
+Allowed by default:
 
-| Profile | Typical value |
-|---------|---------------|
-| `local`, `dev-local` | `http://localhost:8081`, Expo dev server origins |
-| `dev` | `*` (acceptable for internal DEV) |
-| `prod` | Specific origins only (mobile deep links, web admin if any) |
+- method and route template;
+- response status and duration;
+- generated correlation/request ID;
+- pseudonymous internal user identifier only when operationally required;
+- provider outcome and token/cost counts without content.
 
-```java
-// SecurityConfig pattern
-configuration.setAllowedOrigins(corsAllowedOrigins);
-configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Correlation-Id"));
-```
+Disallowed by default:
 
-## Secrets management
+- Firebase tokens or authorization headers;
+- passwords/secrets;
+- AI prompts/responses;
+- full request/response bodies;
+- sensitive domain text;
+- raw provider error payloads that may echo input.
 
-| Secret | Storage | Never in |
-|--------|---------|----------|
-| `OPENAI_API_KEY` | Secret Manager | YAML, git |
-| `ACTUATOR_PASSWORD` | Secret Manager | YAML, git |
-| Firebase service account | Cloud Run SA / local JSON file | git |
+Define retention and access controls for logs per product/data jurisdiction.
 
-## Data access rules
+## AI abuse and cost security
 
-When adding domain resources:
+Authenticate, validate, rate-limit, and check user/environment budget before the provider call. Bound timeout and concurrency. Model output never authorizes an action; tools and data access have deterministic server-side checks.
 
-- Always scope by `userId` from `SecurityContext`
-- Never expose resources by ID alone: `findByIdAndUserId(id, userId)`
-- Validate ownership in `application/` services, not only in controllers
+## Cloud and CI
 
-## Logging security
+- Separate DEV and PROD projects/data/secrets.
+- Least-privilege runtime identities per environment.
+- Protected `main` and protected production environment.
+- Deployment uses immutable digests and verified provenance.
+- No production build from unreviewed fork code with secrets available.
+- Dependency, container, secret, and infrastructure scans have an explicit policy/owner.
 
-Do not log:
+## Deployment checklist
 
-- Full Firebase ID tokens
-- `ACTUATOR_PASSWORD` or API keys
-- User passwords (Firebase handles auth — backend never sees passwords)
-
-Correlation IDs are safe to log.
-
-## Optional: suspended users
-
-Extension pattern (not in MVP):
-
-- `SuspendedUserFilter` blocks suspended users except `GET /api/me`
-- `User.suspended` flag in Firestore
-
-## Optional: Firebase App Check
-
-Post-MVP abuse prevention for mobile clients. Verify App Check tokens in addition to Firebase Auth.
-
-## Cloud Run
-
-- `--allow-unauthenticated` at Cloud Run level — application enforces auth
-- Dedicated service account per environment with least-privilege IAM
-- No public Firestore or GCS access from client
-
-## Security checklist (deploy)
-
-- [ ] `ACTUATOR_PASSWORD` set in Secret Manager
-- [ ] CORS restricted in PROD
-- [ ] Service account has minimum required roles
-- [ ] No secrets in `application-prod.yml`
-- [ ] Firebase projects separated (DEV vs PROD)
-
-## Related docs
-
-- [AUTHENTICATION.md](./AUTHENTICATION.md)
-- [cicd_deployment_plan.md](./cicd_deployment_plan.md)
-- [operations/ACTUATOR.md](./operations/ACTUATOR.md)
+- [ ] Local mocks require explicit `local`
+- [ ] Production Firebase project matches the production client
+- [ ] Production CORS lists exact web origins
+- [ ] Public endpoints reveal no build/environment detail
+- [ ] Standard errors contain correlation ID and no provider internals
+- [ ] AI limits, timeout, budget, and safe telemetry are active
+- [ ] Service accounts have only required permissions
+- [ ] Secrets are versioned/rotatable and absent from source/logs
+- [ ] Production deploy promotes a verified digest with approval
+- [ ] Cross-user authorization tests pass
+- [ ] Rollback and incident owner are documented

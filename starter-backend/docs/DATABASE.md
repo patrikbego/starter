@@ -1,115 +1,64 @@
 # Database
 
-Firestore is the persistence layer for the starter backend MVP. There is no traditional ORM — repository adapters use the Firestore SDK directly behind port interfaces.
+Firestore is the starter persistence default. Application/domain code depends on repository ports and does not import Firestore types.
 
-## Design principles
+## Starter data model
 
-1. **Port interface** — `UserRepositoryPort` in `ports/`; business logic never imports Firestore types.
-2. **POJO mapping** — domain models use Lombok `@Data`; adapters map via `toObject()` / `.set()`.
-3. **Portable** — swap `FirestoreUserRepositoryAdapter` for a PostgreSQL adapter without changing `UserService`.
-
-## MVP data model
-
-### Collection: `users`
-
-Document ID = Firebase UID.
-
-| Field | Type | Source |
-|-------|------|--------|
-| `id` | string | Firebase UID |
-| `email` | string | Firebase token claim |
-| `displayName` | string | Firebase token or user profile |
-| `createdAt` | timestamp | Set on first provision |
-| `updatedAt` | timestamp | Updated on each save |
-
-Example document:
-
-```json
-{
-  "id": "abc123firebaseUid",
-  "email": "user@example.com",
-  "displayName": "Jane Doe",
-  "createdAt": "2026-01-15T10:00:00Z",
-  "updatedAt": "2026-01-15T10:00:00Z"
-}
+```text
+users/{firebaseUid}
 ```
 
-## UserRepositoryPort
+| Field | Type | Policy |
+|---|---|---|
+| `id` | string | Equals verified Firebase UID/document ID |
+| `email` | string/null | Initial verified claim; synchronization policy explicit |
+| `displayName` | string/null | Initial verified claim or user-managed by product policy |
+| `createdAt` | timestamp | Server-set once |
+| `updatedAt` | timestamp | Server-set when a real update occurs |
+
+The current prototype implements load-or-create. Before template v1, prove concurrent first requests cannot produce inconsistent data and define claim synchronization.
+
+## Repository boundary
 
 ```java
 public interface UserRepositoryPort {
-    Optional<User> findById(String userId);
+    Optional<User> findById(String id);
     User save(User user);
 }
 ```
 
-Implemented by:
+The port expresses application needs, not Firestore vocabulary. Product repositories should add narrower intent-based methods when authorization/query behavior matters rather than growing one generic CRUD repository.
 
-| Profile | Implementation |
-|---------|----------------|
-| `local` | `MockUserRepositoryAdapter` (in-memory map) |
-| `dev-local`, `dev`, `prod` | `FirestoreUserRepositoryAdapter` |
+## Ownership rule for extensions
 
-## Firestore setup
+Every user-owned record includes an ownership/tenant key and every lookup is scoped:
 
-### GCP (DEV / PROD)
-
-Created during [COMMON_GCP_SETUP.md](../scripts/COMMON_GCP_SETUP.md):
-
-```bash
-gcloud firestore databases create \
-  --project=starter-dev \
-  --location=eur3 \
-  --type=firestore-native
+```text
+findByIdAndOwnerId(resourceId, authenticatedUserId)
 ```
 
-Service account needs `roles/datastore.user`.
+Looking up by ID and checking ownership later can leak existence through timing/errors and encourages missed checks.
 
-### Local emulator
+## Environment isolation
 
-```bash
-firebase emulators:start --only firestore
-export FIRESTORE_EMULATOR_HOST=localhost:8080
-export GOOGLE_CLOUD_PROJECT=starter-local
-```
+| Profile | Persistence |
+|---|---|
+| `local` | In-memory fake or explicit emulator |
+| `dev-local` | DEV Firestore only |
+| `dev` | DEV Firestore |
+| `prod` | PROD Firestore |
 
-With `local` profile, `MockUserRepositoryAdapter` avoids Firestore entirely.
+Use distinct runtime identities. Add a startup guard comparing intended environment/project identifiers so a DEV process cannot point at PROD by typo.
 
-### Dev-local (real Firestore)
+## New collection checklist
 
-```bash
-export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.gcp/starter-dev-sa.json"
-export GCP_PROJECT_ID=starter-dev
-```
+- [ ] Access patterns and required indexes documented
+- [ ] Owner/tenant source is verified principal
+- [ ] Maximum document/request sizes defined
+- [ ] Concurrency/idempotency behavior defined
+- [ ] Retention, deletion, export/restore, and privacy policy defined
+- [ ] Sensitive fields excluded from logs
+- [ ] Emulator/adapter tests plus cross-user denial tests added
+- [ ] Backfill/migration is backward-compatible and resumable
 
-Connects to real `starter-dev` Firestore.
-
-## Adding domain collections
-
-When forking for a product:
-
-1. Add domain model in `domain/`
-2. Add `XxxRepositoryPort` in `ports/`
-3. Add `FirestoreXxxRepositoryAdapter` in `adapters/gcp/`
-4. **Always scope queries by `userId`** — never fetch by resource ID alone
-
-Example composite index: create via Firebase Console when Firestore returns an index-required error with a direct link.
-
-## Security rules
-
-Firestore security rules are **not** the primary access control for the API — the backend uses a service account with full collection access. Client apps do not connect to Firestore directly in the starter architecture.
-
-If you add client-side Firestore access later, write restrictive rules per collection.
-
-## Future portability
-
-| Current | Migration path |
-|---------|----------------|
-| Firestore | PostgreSQL + JPA adapter implementing same port |
-| Firestore vectors | pgvector, Qdrant, Pinecone behind `VectorSearchPort` |
-
-## Related docs
-
-- [backend_architecture_plan.md](./backend_architecture_plan.md) § Data Model
-- [AUTHENTICATION.md](./AUTHENTICATION.md) — user provisioning flow
-- [scripts/COMMON_GCP_SETUP.md](../scripts/COMMON_GCP_SETUP.md)
+Firestore rules do not protect Admin SDK server access; backend IAM and application authorization do.

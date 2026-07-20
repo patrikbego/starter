@@ -1,295 +1,189 @@
-# Starter Backend Architecture Plan
+# Backend Architecture
 
-## 1. Product Vision
+## 1. Purpose
 
-The starter backend is a **generic API foundation** for mobile-first applications. It is not tied to a specific product domain — you fork it, rename placeholders, and add your business logic.
+The backend template is the server-side foundation for many unrelated applications. It standardizes platform concerns and contains almost no product domain.
 
-Out of the box it provides:
+Included in starter core:
 
-- Firebase Authentication verification on every protected request
-- User auto-provisioning in Firestore on first authenticated call
-- A minimal AI chat endpoint via Spring AI + OpenRouter
-- Health checks for Cloud Run and client reachability
-- Production-ready deployment on Google Cloud Run with DEV/PROD environments
+- Firebase ID-token verification
+- current-user provisioning behind a persistence port
+- a minimal, stateless AI request behind a provider port
+- standard validation/errors and correlation IDs
+- liveness/readiness and protected diagnostics
+- explicit local/DEV/PROD configuration
+- repeatable Cloud Run infrastructure and delivery
+- a versioned OpenAPI contract
 
-The **mobile client** (Expo) is documented in [starter-mobile](../starter-mobile/) — `docs/mobile_architecture_plan.md`. This document defines the backend APIs and infrastructure those apps call.
+Excluded from starter core: documents, files, OCR, subscriptions, billing, background workflows, search, RAG, organizations, and admin portals.
 
-### 1.1 Implementation Status
+## 2. Current prototype versus target v1
 
-| Component | Status |
-|-----------|--------|
-| Documentation | Complete |
-| API: auth, `/api/me`, `/api/chat` | Implemented |
-| Firestore user repository | Implemented |
-| Spring AI + OpenRouter adapter | Implemented |
-| GitHub Actions deploy workflows | Implemented |
-| File upload / GCS | Extension only — see `STORAGE_EXTENSION.md` |
+| Concern | Prototype | Target v1 |
+|---|---|---|
+| Git | Child of parent repository | Independent repository |
+| API | `/api/me`, `/api/chat` | OpenAPI-owned `/api/v1/me`, `/api/v1/ai/chat` |
+| Health | Public actuator health/info | Minimal live/ready; diagnostics protected |
+| Profiles | `local` is the default | `local` explicit; cloud config fails closed |
+| AI | Provider call plus unused `sessionId` | Explicitly stateless plus rate/cost/timeout controls |
+| CI/CD | Separate concurrent test/deploy workflows | Verify -> build -> deploy dependency; immutable digest promotion |
+| Infrastructure | Manual GCP guides | Versioned, idempotent infrastructure code |
+| Dependencies | Older Spring Boot and milestone Spring AI | Supported, tested stable baseline |
 
----
+## 3. Design principles
 
-## 2. Key Architectural Principles
+### Purposeful ports and adapters
 
-### 2.1 Google Cloud First, But Portable
-
-The first version uses Google Cloud services because they fit well with mobile-first, serverless, AI-enabled applications. However, the backend avoids deep vendor lock-in by using a ports-and-adapters architecture.
-
-Cloud-specific technologies are hidden behind interfaces:
-
-| Port | Purpose |
-|------|---------|
-| `UserRepositoryPort` | User profile persistence |
-| `AiChatPort` | AI completion / chat |
-| `AuthService` (implicit via filter) | Firebase token verification |
-
-Future adapters can target PostgreSQL, AWS S3, Anthropic API, etc. without changing `application/` services.
-
-### 2.2 Pay-Per-Usage / Scale-to-Zero
-
-Preferred deployment: **Google Cloud Run** — scales to zero when idle.
-
-Avoid during MVP:
-
-- Kubernetes clusters
-- Always-running VMs
-- Self-hosted databases or vector stores
-
-### 2.3 Simple MVP First
-
-The starter focuses on:
-
-- Secure API with Firebase auth
-- User profile persistence
-- One AI endpoint to prove integration
-- Production-ready security basics (CORS, actuator protection, structured logging)
-
-Advanced features (file upload, subscriptions, search, async workers) are **extension paths** documented separately.
-
----
-
-## 3. Recommended Technology Stack
-
-### 3.1 Backend
-
-- Java 21
-- Spring Boot 3.x
-- Spring Web
-- Spring Security
-- Spring AI (OpenAI-compatible starter)
-- Firebase Admin SDK
-- Google Cloud Java SDKs (Firestore)
-- Lombok
-- Logback + logstash-logback-encoder (JSON in cloud profiles)
-
-### 3.2 Google Cloud Services
-
-| Service | MVP use |
-|---------|---------|
-| Cloud Run | API hosting |
-| Firestore | User profiles |
-| Secret Manager | API keys, actuator password |
-| Artifact Registry | Docker images |
-| Cloud Logging | Structured logs from Cloud Run |
-
-Optional (extensions): Cloud Storage, Cloud Tasks, Document AI.
-
-### 3.3 Authentication
-
-- Firebase Authentication (client-side sign-in)
-- Firebase Admin SDK in backend for token verification
-- Firebase App Check (post-MVP, abuse prevention)
-
-### 3.4 AI
-
-- Spring AI with OpenAI-compatible API
-- OpenRouter as provider (`https://openrouter.ai/api/v1`)
-- API key in Secret Manager (`openai-api-key`)
-
----
-
-## 4. Package Structure
+Abstract provider capabilities that product code may need to replace. Do not wrap every Spring class.
 
 ```text
-com.starter/
-├── StarterApplication.java
-├── api/
-│   ├── MeController.java            # GET /api/me
-│   ├── ChatController.java          # POST /api/chat
-│   ├── dto/                         # Request/response DTOs
-│   └── GlobalExceptionHandler.java
-├── application/
-│   ├── UserService.java             # getOrCreateUser, getCurrentUser
-│   └── ChatService.java             # sendMessage, session handling
-├── domain/
-│   ├── User.java
-│   └── ChatMessage.java
-├── ports/
-│   ├── UserRepositoryPort.java
-│   └── AiChatPort.java
+HTTP adapter -> application use case -> domain
+                         |
+                         v
+                 outbound port <- infrastructure adapter
+```
+
+Starter ports:
+
+| Port | Responsibility |
+|---|---|
+| `UserRepositoryPort` | Load/create the starter user record |
+| `AiChatPort` | Request a bounded text completion |
+
+Firebase token verification is a security adapter. If it becomes a replaceable product choice, formalize an identity-verification port; until then, keep its types out of application/domain code.
+
+### Security in the use case
+
+Controllers receive the verified principal. Application services decide which user/resource may be accessed. Repositories support scoped lookups such as `(resourceId, ownerId)`; a controller-supplied user ID is never authoritative.
+
+### Serverless, not cloud-entangled
+
+Cloud Run and Firestore provide an inexpensive default. Their SDKs remain in adapters/configuration. Domain and application tests run without Google Cloud.
+
+### Fail closed
+
+Mocks require the explicit `local` profile. `dev`, `prod`, and an unset profile never create a mock verifier. Missing required variables, credentials, or invalid environment pairings stop startup.
+
+## 4. Package layout
+
+```text
+src/main/java/com/starter/
+├── api/             # HTTP controllers, DTOs, exception mapping
+├── application/     # use cases and authorization decisions
+├── domain/          # plain domain types
+├── ports/           # outbound capability interfaces
 ├── adapters/
-│   ├── gcp/
-│   │   └── FirestoreUserRepositoryAdapter.java
-│   ├── ai/
-│   │   ├── SpringAiOpenRouterAdapter.java
-│   │   └── MockAiChatAdapter.java       # @Profile("local")
-│   └── firebase/
-│       ├── FirebaseAuthServiceImpl.java
-│       └── MockFirebaseAuthService.java # @Profile("local")
-├── config/
-│   ├── SecurityConfig.java
-│   ├── FirebaseConfig.java
-│   └── AiConfig.java
-├── security/
-│   ├── FirebaseAuthenticationFilter.java
-│   ├── FirebaseAuthenticationToken.java
-│   └── FirebaseUser.java
-└── logging/
-    ├── CorrelationIdFilter.java
-    └── RequestResponseLoggingFilter.java
+│   ├── ai/          # provider implementation and local mock
+│   ├── firebase/    # identity verification adapter
+│   └── gcp/         # Firestore adapter
+├── config/          # bean/config validation
+├── security/        # principal and filter chain
+├── logging/         # correlation and safe request metadata
+└── health/          # target live/ready indicators
+
+openapi/openapi.yaml # target source of truth for public HTTP contract
+infra/               # target repeatable DEV/PROD resources
 ```
 
----
+Rules:
 
-## 5. API Contract (MVP)
+- `domain` imports only JDK types.
+- `application` imports domain and ports, not cloud SDKs or web DTOs.
+- Adapters map provider failures into application-defined failures.
+- API DTOs do not expose persistence models directly.
+- No prompt or response content is logged by platform filters.
 
-### 5.1 Health
+## 5. Target API contract
+
+### `GET /api/v1/me`
 
 ```http
-GET /actuator/health
+Authorization: Bearer <firebase-id-token>
 ```
-
-Public. Returns Spring Actuator health response. Used by Cloud Run and mobile reachability check.
-
-### 5.2 Current User
-
-```http
-GET /api/me
-Authorization: Bearer <firebase_id_token>
-```
-
-Response:
 
 ```json
 {
   "id": "firebase-uid",
   "email": "user@example.com",
   "displayName": "Jane Doe",
-  "createdAt": "2026-01-15T10:00:00Z"
+  "createdAt": "2026-07-20T10:00:00Z"
 }
 ```
 
-On first call, the backend creates the user record in Firestore if it does not exist.
+The first valid call creates the record atomically/idempotently. Later token changes require an explicit policy for synchronizing email/display name.
 
-### 5.3 AI Chat
-
-```http
-POST /api/chat
-Authorization: Bearer <firebase_id_token>
-Content-Type: application/json
-
-{
-  "message": "Hello, what can you do?",
-  "sessionId": "optional-uuid-for-multi-turn"
-}
-```
-
-Response:
+### `POST /api/v1/ai/chat`
 
 ```json
 {
-  "reply": "I'm a starter kit assistant...",
-  "sessionId": "uuid"
+  "message": "Explain this feature in one sentence"
 }
 ```
 
-Errors: `400` invalid body, `401` unauthenticated, `429` rate limited, `502` AI provider failure.
+```json
+{
+  "reply": "...",
+  "requestId": "correlation-or-ai-request-id"
+}
+```
 
----
+This endpoint is stateless. Conversation IDs/history are a product extension that require persistence, retention, authorization, deletion, and token-budget rules.
 
-## 6. Data Model (MVP)
+### Standard error
 
-### Collection: `users`
+```json
+{
+  "code": "VALIDATION_ERROR",
+  "message": "Message must not be empty",
+  "correlationId": "01K..."
+}
+```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string | Firebase UID (document ID) |
-| `email` | string | From Firebase token |
-| `displayName` | string | Optional |
-| `createdAt` | timestamp | First provision time |
-| `updatedAt` | timestamp | Last update |
+Every `4xx`/`5xx`, including authentication failures, uses the same envelope. Do not leak provider or stack details.
 
-No other collections in the starter MVP. Add domain collections when forking.
+## 6. Data
 
-See [DATABASE.md](./DATABASE.md) for repository port details.
+Starter core stores one `users/{firebaseUid}` document. Product collections are added with explicit ownership and lifecycle rules.
 
----
+Required data concerns before adding a collection:
 
-## 7. Spring Profiles
+- authorization key and scoped query pattern;
+- validation and maximum size;
+- indexes and expected access paths;
+- idempotency/concurrency behavior;
+- retention, export/restore, and deletion;
+- sensitive-field logging policy.
 
-| Profile | Use case | Adapters |
-|---------|----------|----------|
-| `local` | Offline dev | All mocks |
-| `dev-local` | IDE → real DEV GCP | Real Firestore + Firebase; optional auth emulator |
-| `dev` | Cloud Run DEV | All real |
-| `prod` | Cloud Run PROD | All real |
+## 7. Profiles
 
-Configuration files: `application-{profile}.yml`.
+| Profile | Adapters | Credentials |
+|---|---|---|
+| `local` | deterministic mocks or explicit emulators | none |
+| `dev-local` | real DEV adapters | developer ADC/DEV provider key |
+| `dev` | real DEV adapters on Cloud Run | runtime identity + DEV secrets |
+| `prod` | real PROD adapters on Cloud Run | runtime identity + PROD secrets |
 
----
+Use configuration validation and profile tests to prove that `dev`/`prod` cannot start with local mocks.
 
-## 8. Security Summary
+## 8. AI boundary
 
-- Stateless sessions (`SessionCreationPolicy.STATELESS`)
-- CSRF disabled (stateless API)
-- Public: `/actuator/health`, `/actuator/info`
-- Admin (HTTP Basic): other `/actuator/**` endpoints
-- All `/api/**` require valid Firebase Bearer token
+`AiChatPort` accepts the smallest provider-neutral request needed by the use case. Application code owns input validation, user quota, timeout policy, and safe metrics. The adapter owns provider request mapping and provider-specific error translation.
 
-See [SECURITY.md](./SECURITY.md) and [AUTHENTICATION.md](./AUTHENTICATION.md).
+Model identifiers are managed configuration, not hardcoded domain decisions. A production rollout of a new model follows normal release/change control because model behavior can change product behavior.
 
----
+## 9. Testing strategy
 
-## 9. Build Phases
+| Layer | Test |
+|---|---|
+| Domain/application | Fast unit tests with fake ports |
+| API/security | Spring integration tests for auth, validation, errors, correlation |
+| Adapters | Emulator/provider-contract tests separated from unit tests |
+| Contract | OpenAPI validation plus implementation compatibility |
+| Container | Build/start/health smoke test |
+| Deployment | DEV smoke test using immutable digest |
 
-### Phase 1: Foundation (starter MVP)
+No real AI provider call runs in the default PR test suite.
 
-- [x] Project scaffold (Maven, Spring Boot, profiles)
-- [x] Firebase auth filter + SecurityConfig
-- [x] UserService + FirestoreUserRepositoryAdapter
-- [x] MeController (`GET /api/me`)
-- [x] AiChatPort + SpringAiOpenRouterAdapter + MockAiChatAdapter
-- [x] ChatController (`POST /api/chat`)
-- [x] Correlation ID + structured logging
-- [x] Dockerfile + GitHub Actions deploy-dev / deploy-prod
-- [x] Local profile with mocks
+## 10. Extension rule
 
-### Phase 2: Extensions (per product)
-
-- [ ] File upload (GCS signed URLs) — `STORAGE_EXTENSION.md`
-- [ ] Subscriptions (RevenueCat webhooks)
-- [ ] Async processing (Cloud Tasks)
-- [ ] Search / RAG (embeddings, vector search)
-
----
-
-## 10. Future Extensions
-
-When forking for a product that needs more than the starter MVP:
-
-| Extension | Suggested approach |
-|-----------|-------------------|
-| File storage | `ObjectStoragePort` + GCS adapter — see `STORAGE_EXTENSION.md` |
-| Subscriptions | `SubscriptionPort` + RevenueCat adapter + webhook controller |
-| Background jobs | Cloud Tasks + worker endpoints in same Cloud Run service |
-| Vector search | `EmbeddingPort` + `VectorSearchPort`; Firestore vector or dedicated DB |
-| Multi-tenant admin | Separate `ROLE_ADMIN` users, admin-only controllers |
-
-Reference implementation patterns: [docsera](https://github.com/patrikbego/docsera) repository.
-
----
-
-## Related docs
-
-- [cicd_deployment_plan.md](./cicd_deployment_plan.md)
-- [MVP_SCOPE_CHECKLIST.md](./MVP_SCOPE_CHECKLIST.md)
-- [AI_INTEGRATION.md](./AI_INTEGRATION.md)
-- [../docs/NEW_APP_WORKFLOW.md](../../docs/NEW_APP_WORKFLOW.md)
+Add an extension only when a product needs it. Start with its use case and ownership/security model, then introduce the smallest necessary port and adapter. The Docsera backend is a reference for storage and subscription patterns, not code that belongs automatically in this template.

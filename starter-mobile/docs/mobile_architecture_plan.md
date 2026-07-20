@@ -1,264 +1,139 @@
-# Starter Mobile Architecture Plan
+# Mobile Architecture
 
-## 1. Product Vision
+## 1. Purpose
 
-The starter mobile app is a **generic Expo client foundation** for mobile-first products. It is not tied to a specific domain — you fork it, rebrand, and add screens and features.
+The mobile template is a thin, secure client for many different application domains. It standardizes navigation composition, authentication, API access, server-state handling, environment configuration, errors, and delivery. Branding and product features are added only after creating a product repository.
 
-Out of the box it provides:
+## 2. Current prototype versus target v1
 
-- Firebase Authentication (sign-in / sign-out)
-- Auth gate routing (unauthenticated → login)
-- Home screen showing user profile from `GET /api/me` and backend health status
-- Simple AI chat screen calling `POST /api/chat`
-- Environment-aware API base URL (DEV vs PROD)
+| Concern | Prototype | Target v1 |
+|---|---|---|
+| Git | Child of parent repository | Independent repository |
+| API | Handwritten types, unversioned paths | Pinned/validated OpenAPI contract and `/api/v1` |
+| Auth | Firebase JS adapter | Explicit React Native persistence and tested restore/refresh |
+| Config | DEV localhost fallback | Build-type validation; production fails on missing/mixed config |
+| Tests | TypeScript and lint config | Unit/component/integration contract checks |
+| Delivery | Parent workflows | Repository-owned preview and store-release workflows |
+| Release | Preview build described as promotable | Separate store candidate tested then released unchanged |
 
-The backend APIs and infrastructure are defined in [starter-backend](../starter-backend/) — `docs/backend_architecture_plan.md`.
+## 3. Principles
 
-### 1.1 Implementation Status
+### Backend is authoritative
 
-| Component | Status |
-|-----------|--------|
-| Documentation | Complete |
-| Expo project scaffold | Implemented |
-| Firebase Auth | Implemented |
-| API client + TanStack Query | Implemented |
-| Auth gate + login screen | Implemented |
-| Home + chat screens | Implemented |
-| `app.config.ts` / EAS profiles | Implemented |
-| GitHub Actions + `eas.json` | Implemented |
+Firebase supplies a client token; the backend verifies identity and owns user provisioning, authorization, domain rules, and AI calls. Client-side checks improve UX but are never the only enforcement.
 
----
+### Feature-oriented UI
 
-## 2. Key Architectural Principles
+Routes compose features. Feature modules contain hooks/components and depend on small ports. Adapters own Firebase/HTTP details.
 
-### 2.1 Backend Is Source of Truth
+### Server state is server state
 
-The mobile app is a **thin, authenticated client**.
+Use TanStack Query for remote data, cache invalidation, loading/error/retry state. Use component/context state for short-lived UI/session composition. Do not duplicate `/me` or domain records into ad hoc global state.
 
-Never treat local state as authoritative for:
+### Configuration fails early
 
-- User profile data (fetch from `GET /api/me`)
-- AI responses (from `POST /api/chat`)
-- Business rules (enforce on API when adding features)
+`app.config.ts` validates environment pairing during build. Production cannot default to DEV/localhost, and DEV/PROD Firebase project IDs cannot be crossed.
 
-### 2.2 Portable Client Boundaries
-
-Use ports-and-adapters:
-
-| Port | Responsibility |
-|------|----------------|
-| `AuthPort` | Sign-in, sign-out, current user, ID token |
-| `ApiPort` | HTTP with auth header injection |
-
-Implementations in `src/adapters/`; screens depend on ports or feature hooks.
-
-### 2.3 Simple MVP First
-
-Avoid in starter MVP:
-
-- Offline-first sync
-- Client-side AI
-- Local SQLite vault
-- File upload UI (extension — see backend `STORAGE_EXTENSION.md`)
-
-Use TanStack Query cache + refetch for server state.
-
-### 2.4 Security by Default
-
-- Firebase ID token on every protected API call
-- `expo-secure-store` for token persistence where needed
-- No GCP service account keys on device
-- No backend API secrets in app (only public Firebase keys via build-time env)
-- No logging of tokens in production
-
----
-
-## 3. Technology Stack
-
-### 3.1 Core
-
-| Area | Choice |
-|------|--------|
-| Runtime | Expo ~54, React Native, React 19 |
-| Navigation | expo-router (file-based) |
-| Language | TypeScript (strict) |
-| Linting | eslint-config-expo |
-
-### 3.2 Authentication
-
-- Firebase Authentication (email/password minimum)
-- Expo **development build** for native Firebase modules
-- Config via Expo config plugin + `google-services.json` / `GoogleService-Info.plist` per env
-
-### 3.3 API and State
-
-- Typed REST client (fetch) with interceptors
-- TanStack Query for `/api/me`, health check, chat
-- React context for auth session only
-
-### 3.4 Planned dependencies (implementation phase)
-
-```json
-{
-  "@tanstack/react-query": "...",
-  "firebase": "...",
-  "expo-secure-store": "...",
-  "expo-constants": "..."
-}
-```
-
----
-
-## 4. Navigation Structure
+## 4. Structure
 
 ```text
 app/
-  _layout.tsx              # Root: providers + auth gate
-  (auth)/
-    login.tsx              # Email/password sign-in
-  (tabs)/
-    _layout.tsx            # Tab navigator
-    index.tsx              # Home: user + health
-    chat.tsx               # AI chat
-```
+├── _layout.tsx
+├── (auth)/
+│   └── login.tsx
+└── (tabs)/
+    ├── index.tsx
+    └── chat.tsx
 
-### Auth gate flow
-
-```text
-App launch
-  → AuthProvider checks Firebase session
-  → If no session: redirect to /(auth)/login
-  → If session: load (tabs)
-```
-
----
-
-## 5. Feature Modules
-
-```text
 src/
-  config/
-    env.ts                 # apiBaseUrl, firebase config from Constants
-  ports/
-    AuthPort.ts
-    ApiPort.ts
-  adapters/
-    FirebaseAuthAdapter.ts
-    HttpApiClient.ts
-  features/
-    auth/
-      useAuth.ts
-      AuthProvider.tsx
-    profile/
-      useMe.ts             # TanStack Query → GET /api/me
-      useHealth.ts         # GET /actuator/health
-    chat/
-      useChat.ts           # POST /api/chat mutation
+├── api/             # generated/validated contract types and fixtures
+├── adapters/        # FirebaseAuthAdapter, HttpApiClient
+├── config/          # validated environment and build metadata
+├── features/
+│   ├── auth/
+│   ├── profile/
+│   └── chat/
+├── ports/           # AuthPort, ApiPort
+└── providers/       # query/auth/app composition
 ```
 
----
+Product features get their own directory and route(s). Avoid generic `utils/` dumping grounds; place behavior next to its owner.
 
-## 6. API Integration
+## 5. Authentication
+
+The auth adapter provides:
+
+- sign in/sign up/sign out;
+- current ID token with optional forced refresh;
+- auth-state subscription;
+- explicit durable persistence supported by the pinned Firebase/React Native stack.
+
+The auth gate renders a stable loading state while persistence restores. It never briefly exposes authenticated routes before identity is known.
+
+On API `401`: force-refresh once, retry once, then clear session and return to login. Concurrent `401`s should share one refresh operation rather than triggering a refresh storm.
+
+## 6. API and errors
+
+The backend OpenAPI contract is pinned by release/version. The HTTP adapter:
+
+- joins a validated HTTPS base URL and contract path;
+- injects the Firebase token for protected endpoints;
+- sets/propagates a bounded correlation ID when useful;
+- applies a request timeout/abort policy;
+- decodes the standard error envelope;
+- retries only when policy says the operation is safe;
+- never logs tokens or full sensitive payloads.
 
 See [BACKEND_INTEGRATION.md](./BACKEND_INTEGRATION.md).
 
-| Endpoint | Mobile use |
-|----------|------------|
-| `GET /actuator/health` | Home screen backend status badge |
-| `GET /api/me` | Home screen user profile |
-| `POST /api/chat` | Chat screen send/receive |
+## 7. State and UX
 
-Auth header on protected calls:
+Starter query keys:
 
-```http
-Authorization: Bearer <firebase_id_token>
+```text
+['me']
+['health']
 ```
 
----
+The AI mutation maintains only on-screen transient messages. It does not imply server conversation memory. Products that persist conversations need a versioned backend contract and local privacy/cache policy.
 
-## 7. Error Handling
+Every screen includes loading, empty, error, and retry behavior. Accessibility labels, dynamic text, keyboard handling, reduced motion, color contrast, and safe-area behavior are baseline acceptance criteria, not a branding phase.
 
-| HTTP | Client behavior |
-|------|-----------------|
-| 401 | Refresh token once → retry → sign out |
-| 403 | Show permission message |
-| 404 | Navigate back |
-| 429 | Rate limit message |
-| 5xx | Generic retry message |
+## 8. Configuration
 
----
+Use one public variable name per concept with environment-specific EAS values:
 
-## 8. Environment Configuration
-
-### app.config.ts (planned)
-
-```typescript
-const appEnv = process.env.APP_ENV ?? 'development';
-const apiBaseUrl =
-  appEnv === 'production'
-    ? process.env.API_BASE_URL_PROD
-    : process.env.API_BASE_URL_DEV;
-
-export default {
-  expo: {
-    extra: {
-      appEnv,
-      apiBaseUrl,
-      firebase: {
-        apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-        authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-        projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-      },
-    },
-  },
-};
+```text
+APP_ENV
+EXPO_PUBLIC_API_BASE_URL
+EXPO_PUBLIC_FIREBASE_API_KEY
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN
+EXPO_PUBLIC_FIREBASE_PROJECT_ID
+EAS_PROJECT_ID
 ```
 
-**Rule:** DEV builds must never default to PROD API URL.
+Build validation:
 
----
+- production requires HTTPS and a PROD project ID;
+- preview requires a configured DEV HTTPS URL;
+- localhost is allowed only for deliberate local development;
+- required values are never replaced with production defaults;
+- app identifiers/schemes match the selected variant.
 
-## 9. Build Phases
+Public Expo/Firebase configuration is visible in the binary. Server secrets never use `EXPO_PUBLIC_*`.
 
-### Phase 1: Foundation (starter MVP)
+## 9. Testing
 
-- [x] Expo project with expo-router
-- [x] `app.config.ts` with env-driven `apiBaseUrl`
-- [x] Firebase Auth adapter + AuthProvider
-- [x] HttpApiClient with Bearer injection
-- [x] TanStack Query provider
-- [x] Login screen
-- [x] Home screen (`/api/me` + health)
-- [x] Chat screen (`/api/chat`)
-- [x] Auth gate in root layout
-- [x] `eas.json` + GitHub Actions CI
+| Layer | Coverage |
+|---|---|
+| Pure feature logic | Unit tests |
+| Auth/query providers | Component tests with fake ports |
+| HTTP adapter | Token injection, single refresh, errors, timeout |
+| Contract | Pinned OpenAPI/generated type validation and fixtures |
+| Navigation | Auth restoration and route gating |
+| Build config | DEV/PROD pairing and missing-value failures |
+| Device smoke | Login -> `/me` -> AI -> sign out |
 
-### Phase 2: Extensions (per product)
+## 10. Extensions
 
-- [ ] File upload UI (signed URL flow)
-- [ ] RevenueCat subscriptions
-- [ ] Additional tab screens
-- [ ] Push notifications
-- [ ] Firebase App Check
-
----
-
-## 10. Future Extensions
-
-| Extension | Approach |
-|-----------|----------|
-| File upload | `DocumentUploadPort` + image/document picker |
-| Subscriptions | RevenueCat + `SubscriptionPort` |
-| Offline cache | TanStack Query `staleTime` / persistence (not full sync) |
-| Deep linking | expo-router linking config |
-
-Reference: [docsera-mobile](https://github.com/patrikbego/docsera-mobile) for document-vault patterns.
-
----
-
-## Related docs
-
-- [BACKEND_INTEGRATION.md](./BACKEND_INTEGRATION.md)
-- [mobile_mvp_scope_checklist.md](./mobile_mvp_scope_checklist.md)
-- [mobile_cicd_deployment_plan.md](./mobile_cicd_deployment_plan.md)
-- [../docs/NEW_APP_WORKFLOW.md](../../docs/NEW_APP_WORKFLOW.md)
+Add camera/files, subscriptions, push notifications, analytics, deep links, biometrics, or offline synchronization only for a product that needs them. Each extension must define permissions, privacy, failure states, environment configuration, and backend-contract ownership.

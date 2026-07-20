@@ -1,83 +1,56 @@
-# Starter Backend - Agent Context
+# Starter Backend Agent Context
 
-## What is this?
+## Purpose
 
-A generic backend starter kit for mobile-first applications. It provides authentication, user persistence, AI chat, and Cloud Run deployment patterns that you fork and extend per product.
+This is a generic backend template, not a product. Keep identity, API, data, AI, observability, and delivery foundations reusable; add no Docsera-specific domain behavior.
 
-## Core Technology Stack
+## Status
 
-- **Backend**: Java 21, Spring Boot 3.x, Spring Security, Spring AI
-- **Cloud**: Google Cloud Run (serverless), Firestore, Secret Manager, Artifact Registry
-- **Auth**: Firebase Authentication
-- **AI**: Spring AI + OpenRouter (OpenAI-compatible API)
-- **CI/CD**: GitHub Actions, Docker, Artifact Registry
+The code is a functional prototype still tracked by a parent workspace repository. Target v1 is an independent repository with its own workflows, OpenAPI contract, fail-closed profiles, stable dependency baseline, AI limits, infrastructure code, and immutable promotion. Read `docs/README.md` and `docs/MVP_SCOPE_CHECKLIST.md` before claiming completion.
 
-## Architecture Principles
+## Stack
 
-1. **Portable Design** - Use ports-and-adapters pattern. Cloud services hide behind interfaces so Google Cloud can be swapped for AWS, Azure, or self-hosted alternatives later.
+- Java 21 and Spring Boot/Security
+- Firebase Authentication
+- Firestore behind a repository port
+- Spring AI/OpenAI-compatible provider behind `AiChatPort`
+- Cloud Run, Secret Manager, Artifact Registry
+- GitHub Actions with OIDC/WIF
 
-2. **Scale-to-Zero** - Serverless first (Cloud Run). No always-on infrastructure during MVP.
+## Boundaries
 
-3. **Security by Default** - Every protected request verifies Firebase tokens. Scope data by `userId` when adding domain resources.
-
-## Project Structure
-
-```
-src/main/java/com/starter/
-  application/     - Service layer (UserService, ChatService)
-  domain/          - Domain models (User, ChatMessage)
-  ports/           - Interface definitions (UserRepositoryPort, AiChatPort)
-  adapters/        - Implementation of ports
-    gcp/           - Firestore user repository
-    ai/            - Spring AI + OpenRouter adapter (+ mock for local)
-    firebase/      - Firebase Auth adapter (+ mock for local profile)
-  api/             - REST controllers (MeController, ChatController)
-  config/          - Spring configuration (SecurityConfig, FirebaseConfig, AiConfig)
-  security/        - Security filters (FirebaseAuthenticationFilter)
-  logging/         - CorrelationIdFilter, request logging
-
-src/main/resources/
-  application.yml           - Base shared configuration
-  application-local.yml     - Local development with mocks (@Profile: local)
-  application-dev-local.yml - IntelliJ with real DEV services (@Profile: dev-local)
-  application-dev.yml       - Cloud Run DEV deployment (@Profile: dev)
-  application-prod.yml        - Cloud Run PROD deployment (@Profile: prod)
+```text
+api -> application -> domain
+             |          ^
+             v          |
+            ports <- adapters
 ```
 
-### Profile-Specific Beans
+- No cloud/provider/web types in `domain`.
+- Application services own authorization and policy.
+- Adapters own SDK mapping and provider failures.
+- The backend owns `openapi/openapi.yaml` in target v1.
 
-- `@Profile("local")` - Mocks: `MockFirebaseAuthService`, `MockUserRepositoryAdapter`, `MockAiChatAdapter`
-- `@Profile("!local")` - Real: `FirebaseAuthServiceImpl`, `FirestoreUserRepositoryAdapter`, `SpringAiOpenRouterAdapter`
+## Security rules
 
-## How to Run
+1. Derive identity/ownership only from the verified principal.
+2. Scope protected lookups by resource plus owner/tenant.
+3. Local mocks require explicit `local`; never deploy them.
+4. Never log tokens, secrets, AI prompt/reply content, or sensitive bodies.
+5. Keep secrets in Secret Manager and CI cloud access on short-lived OIDC.
+6. Add rate, budget, timeout, and concurrency controls before real AI production use.
 
-### Local Profile (`local`) - Full Offline Development
+## Current and target routes
+
+Prototype: `/actuator/health`, `/api/me`, `/api/chat`.
+
+Target v1: `/health/live`, `/health/ready`, `/api/v1/me`, `/api/v1/ai/chat` with one standard error envelope.
+
+## Verification
 
 ```bash
-./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+./mvnw verify
+docker build -t starter-backend:local .
 ```
 
-### Dev-Local Profile (`dev-local`) - Real DEV Cloud from IntelliJ
-
-See `scripts/DEV_LOCAL_SETUP.md`.
-
-### Dev / Prod Profiles
-
-Deployed via GitHub Actions to Cloud Run. See `docs/cicd_deployment_plan.md`.
-
-## Rules for Agents
-
-1. Follow hexagonal architecture — business logic in `application/`, no GCP imports in `domain/`
-2. Never commit secrets to YAML or git — use env vars and Secret Manager
-3. All protected endpoints require Firebase Bearer token except `/actuator/health` and `/actuator/info`
-4. Use `@Profile` for mock vs real adapter switching
-5. Keep MVP scope minimal — extend via new ports/adapters, don't bloat the starter
-
-## Documentation
-
-- Architecture: `docs/backend_architecture_plan.md`
-- CI/CD: `docs/cicd_deployment_plan.md`
-- Auth: `docs/AUTHENTICATION.md`
-- Database: `docs/DATABASE.md`
-- AI: `docs/AI_INTEGRATION.md`
-- New app workflow: `../docs/NEW_APP_WORKFLOW.md`
+Deployment must be gated on verification and PROD must use the exact DEV-tested image digest without rebuilding.

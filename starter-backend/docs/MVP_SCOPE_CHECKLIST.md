@@ -1,133 +1,90 @@
-# MVP Scope Checklist
+# Backend Template v1 Scope
 
-Minimal backend APIs for the starter kit. Use this to track implementation progress.
+The prototype implements the basic loop, but template v1 is not yet complete. “Done” means verified from a clean independent repository, not merely present in the current parent workspace.
 
-**Status:** Implemented.
+## Prototype evidence
 
----
+| Capability | Current status |
+|---|---|
+| Spring Boot application and local profile | Implemented |
+| Firebase Bearer-token filter and security integration tests | Implemented |
+| Firestore user repository behind a port | Implemented |
+| `GET /api/me` and current-user provisioning | Implemented |
+| Spring AI/OpenRouter adapter plus local fake | Implemented |
+| `POST /api/chat` with input validation | Implemented |
+| Correlation/logging filters | Implemented |
+| Maven test suite | Passing on 2026-07-20 |
+| Dockerfile and prototype workflows | Present, not production-ready |
 
-## 1. API Endpoints
+## Required before template v1
 
-### 1.1 Health
+### Repository and contract
 
-| Endpoint | Method | Auth | Status |
-|----------|--------|------|--------|
-| `/actuator/health` | GET | Public | Done |
-| `/actuator/info` | GET | Public | Done |
+- [ ] Independent backend Git repository
+- [ ] Workflows moved to its `.github/workflows/`
+- [ ] `openapi/openapi.yaml` is the HTTP source of truth
+- [ ] Routes versioned under `/api/v1`
+- [ ] One error envelope for all failures
+- [ ] Contract validation runs in CI
 
-**Acceptance criteria:**
+### Configuration and security
 
-- [x] Returns `200` with `{"status":"UP"}` when healthy
-- [x] Cloud Run uses this for liveness probe
-- [x] Mobile home screen can call this without auth
+- [ ] Remove implicit `local` default; mocks require explicit opt-in
+- [ ] `dev`/`prod` configuration fails closed
+- [ ] Minimal public liveness; readiness/diagnostics appropriately restricted
+- [ ] Production CORS rejects wildcard and invalid origins
+- [ ] Cross-user authorization pattern and tests documented for extensions
+- [ ] Supported stable dependency baseline selected and verified
 
-### 1.2 User
+### AI
 
-| Endpoint | Method | Auth | Status |
-|----------|--------|------|--------|
-| `/api/me` | GET | Bearer | Done |
+- [ ] Endpoint documented and implemented as stateless
+- [ ] Remove misleading session semantics or implement full authorized memory outside starter core
+- [ ] Per-user rate limit and environment budget
+- [ ] Provider timeout/concurrency/retry policy
+- [ ] Stable `429`/provider error mapping with `Retry-After` where appropriate
+- [ ] Safe metrics without prompt/reply content
 
-**Acceptance criteria:**
+### Data and operations
 
-- [x] Returns `401` without valid Firebase token
-- [x] Returns user profile with `id`, `email`, `displayName`, `createdAt`
-- [x] Creates Firestore user on first call (auto-provision)
-- [x] Subsequent calls return same user without duplicate records
+- [ ] Atomic/idempotent current-user creation behavior tested
+- [ ] DEV/PROD data isolation verified
+- [ ] Backup/export and retention responsibility documented
+- [ ] Structured cloud logs and request IDs verified
+- [ ] Smoke tests exercise readiness, auth rejection, `/me`, and mocked/stubbed AI behavior
 
-### 1.3 AI Chat
+### Delivery
 
-| Endpoint | Method | Auth | Status |
-|----------|--------|------|--------|
-| `/api/chat` | POST | Bearer | Done |
+- [ ] CI is a hard dependency of deployment
+- [ ] Container built once and deployed to DEV by digest
+- [ ] PROD workflow deploys the same eligible digest and contains no build step
+- [ ] OIDC/WIF replaces long-lived cloud keys
+- [ ] Protected production environment/approval configured
+- [ ] Release metadata and rollback drill completed
+- [ ] Repeatable infrastructure code provisions a clean DEV project
 
-**Request body:**
+## Explicit non-goals
 
-```json
-{ "message": "string", "sessionId": "optional" }
-```
+- File/object storage
+- OCR/document processing
+- Subscriptions/payments
+- Async workers
+- Search, embeddings, RAG, tools, or agents
+- Organizations/admin console
+- Multi-region/high-availability architecture
 
-**Acceptance criteria:**
+These are product extensions. Adding them to the template without a product need makes every future app harder to understand and secure.
 
-- [x] Returns `401` without valid token
-- [x] Returns `400` for empty message
-- [x] Returns `{ "reply": "...", "sessionId": "..." }`
-- [x] `local` profile uses mock adapter (no OpenRouter call)
-- [x] `dev`/`prod` profiles call OpenRouter via Spring AI
-- [x] Returns `502` when AI provider fails (with safe error message)
+## End-to-end acceptance test
 
----
+From clean clones and a freshly provisioned DEV environment:
 
-## 2. Infrastructure
-
-| Item | Status |
-|------|--------|
-| Spring Boot project scaffold | Done |
-| Profiles: `local`, `dev-local`, `dev`, `prod` | Done |
-| Firebase auth filter | Done |
-| Firestore user repository | Done |
-| Mock adapters for `local` profile | Done |
-| Dockerfile | Done |
-| `deploy-dev-backend.yml` GitHub Action | Done |
-| `deploy-prod-backend.yml` GitHub Action | Done |
-| Correlation ID logging | Done |
-| JSON logs in cloud profiles | Done |
-
----
-
-## 3. Explicitly out of scope (starter MVP)
-
-| Feature | Extension doc |
-|---------|---------------|
-| File upload / GCS | `STORAGE_EXTENSION.md` |
-| RevenueCat / subscriptions | Architecture § Future extensions |
-| OCR / Document AI | Architecture § Future extensions |
-| Vector search / RAG | `AI_INTEGRATION.md` § Extension |
-| Cloud Tasks workers | Architecture § Future extensions |
-| Webhooks | Architecture § Future extensions |
-| Admin dashboard | Post-MVP |
-
----
-
-## 4. Test scenarios
-
-### Local profile
-
-```bash
-# Health (no auth)
-curl http://localhost:8080/actuator/health
-
-# Me (mock accepts any token)
-curl -H "Authorization: Bearer test-token" http://localhost:8080/api/me
-
-# Chat
-curl -X POST -H "Authorization: Bearer test-token" \
-  -H "Content-Type: application/json" \
-  -d '{"message":"hello"}' \
-  http://localhost:8080/api/chat
-```
-
-### DEV Cloud Run
-
-```bash
-# Get Firebase token from mobile or emulator, then:
-curl -H "Authorization: Bearer $TOKEN" https://starter-api-dev-XXX.run.app/api/me
-```
-
----
-
-## 5. Mobile integration checklist
-
-Coordinate with [starter-mobile/docs/mobile_mvp_scope_checklist.md](../../starter-mobile/docs/mobile_mvp_scope_checklist.md):
-
-- [ ] Mobile login obtains Firebase ID token
-- [ ] Mobile calls `GET /api/me` with Bearer header
-- [ ] Mobile calls `POST /api/chat` and displays reply
-- [ ] DEV mobile build uses DEV API URL and DEV Firebase project
-
----
-
-## Related docs
-
-- [backend_architecture_plan.md](./backend_architecture_plan.md)
-- [AI_INTEGRATION.md](./AI_INTEGRATION.md)
-- [AUTHENTICATION.md](./AUTHENTICATION.md)
+1. CI passes and publishes one image digest.
+2. DEV deploys that digest.
+3. Public liveness is minimal and readiness succeeds.
+4. An unauthenticated `/api/v1/me` request receives standard `401` JSON.
+5. A valid DEV Firebase token provisions/returns the correct user.
+6. A valid AI request returns a bounded stateless reply.
+7. The next over-limit request receives the documented rate-limit response.
+8. The eligible digest can be approved for PROD without rebuilding.
+9. The service can roll back to the previous revision.

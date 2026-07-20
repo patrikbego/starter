@@ -1,61 +1,23 @@
-# Starter Kit Documentation
+# Workspace Documentation
 
-Planning and architecture docs for the starter kit monorepo.
+These documents coordinate the backend and mobile templates while they are developed as sibling folders. They define shared policy; implementation details belong in the repository that owns them.
 
-## Root docs (`docs/`)
+| Document | Purpose |
+|---|---|
+| [REVIEW_FINDINGS.md](./REVIEW_FINDINGS.md) | Evidence-based review of the current prototype and priority gaps |
+| [ARCHITECTURE_OVERVIEW.md](./ARCHITECTURE_OVERVIEW.md) | Target system boundaries and shared design principles |
+| [REPOSITORY_STRATEGY.md](./REPOSITORY_STRATEGY.md) | Why there are two repositories and how they evolve safely |
+| [ENVIRONMENT_MATRIX.md](./ENVIRONMENT_MATRIX.md) | Local, DEV, and PROD configuration across both repositories |
+| [IMPLEMENTATION_ROADMAP.md](./IMPLEMENTATION_ROADMAP.md) | Ordered path from the current prototype to template v1 |
+| [NEW_APP_WORKFLOW.md](./NEW_APP_WORKFLOW.md) | How to create a product from tagged template releases |
 
-| Document | Description |
-|----------|-------------|
-| [ARCHITECTURE_OVERVIEW.md](./ARCHITECTURE_OVERVIEW.md) | System design, principles, shared vs per-app concerns |
-| [NEW_APP_WORKFLOW.md](./NEW_APP_WORKFLOW.md) | Step-by-step guide to fork the monorepo into a new product |
-| [ENVIRONMENT_MATRIX.md](./ENVIRONMENT_MATRIX.md) | DEV/PROD variable mapping (GCP, Firebase, API URL, EAS) |
+Repository-owned documentation:
 
-## Backend docs (`starter-backend/`)
+- [Backend docs](../starter-backend/docs/README.md)
+- [Mobile docs](../starter-mobile/docs/README.md)
 
-| Document | Path |
-|----------|------|
-| Documentation index | [starter-backend/docs/README.md](../starter-backend/docs/README.md) |
-| Architecture plan | `starter-backend/docs/backend_architecture_plan.md` |
-| CI/CD deployment | `starter-backend/docs/cicd_deployment_plan.md` |
-| MVP checklist | `starter-backend/docs/MVP_SCOPE_CHECKLIST.md` |
-| Authentication | `starter-backend/docs/AUTHENTICATION.md` |
-| Database | `starter-backend/docs/DATABASE.md` |
-| AI integration | `starter-backend/docs/AI_INTEGRATION.md` |
-| Security | `starter-backend/docs/SECURITY.md` |
-| Storage extension (optional) | `starter-backend/docs/STORAGE_EXTENSION.md` |
-| Actuator / health | `starter-backend/docs/operations/ACTUATOR.md` |
-| Env config | `starter-backend/scripts/INTEGRATION_ENV_CONFIG.md` |
-| GCP setup | `starter-backend/scripts/COMMON_GCP_SETUP.md`, `DEV_SETUP.md`, `PROD_SETUP.md` |
-| Local dev | `starter-backend/scripts/DEV_LOCAL_SETUP.md` |
+## Ownership rule
 
-## Mobile docs (`starter-mobile/`)
+The backend repository owns the HTTP API contract, cloud runtime, database policy, backend security, and backend delivery. The mobile repository owns client behavior, app identity, native build configuration, store delivery, and supported backend-contract versions.
 
-| Document | Path |
-|----------|------|
-| Documentation index | [starter-mobile/docs/README.md](../starter-mobile/docs/README.md) |
-| Architecture plan | `starter-mobile/docs/mobile_architecture_plan.md` |
-| CI/CD deployment | `starter-mobile/docs/mobile_cicd_deployment_plan.md` |
-| MVP checklist | `starter-mobile/docs/mobile_mvp_scope_checklist.md` |
-| Backend integration | `starter-mobile/docs/BACKEND_INTEGRATION.md` |
-| UI integration plan | `starter-mobile/docs/mobile_ui_integration_plan.md` |
-
-## Quick alignment
-
-```text
-Mobile                          Backend
-------                          -------
-Firebase Auth (client)    <->   Firebase token verification
-GET /api/me               <->   User auto-provision in Firestore
-POST /api/chat            <->   Spring AI via OpenRouter
-APP_ENV / EAS profile     <->   starter-dev / starter-prod GCP projects
-```
-
-Deployment model: **merge to `main` → DEV**; **manual approval → PROD**.
-
-## Core integration loop
-
-```text
-Sign in (Firebase) → GET /api/me (user profile) → POST /api/chat (AI reply)
-```
-
-Backend owns auth verification, user persistence, and AI calls; mobile owns sign-in UI, API client, and chat display.
+Cross-repository documents describe coordination only. They must not become a substitute for a versioned API specification or executable CI checks.

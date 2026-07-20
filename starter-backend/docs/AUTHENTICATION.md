@@ -1,93 +1,59 @@
-# Authentication Flow and API Protection
+# Authentication and Authorization
 
-The Starter Backend API uses Firebase Authentication for user identity and API protection.
+## Flow
 
-## Overview
+1. The client signs in with Firebase Authentication.
+2. The client obtains a short-lived Firebase ID token.
+3. It sends `Authorization: Bearer <token>` to a protected endpoint.
+4. The backend verifies signature, issuer/audience, expiry, and the configured revocation/disabled-user policy through Firebase Admin.
+5. The backend constructs its own principal from verified claims.
+6. Application services use that principal for authorization and ownership.
 
-All protected endpoints require a valid Firebase ID Token (JWT) sent in the `Authorization` header as a Bearer token.
+The backend never receives a Firebase password and never trusts a UID supplied in a request body/query parameter.
 
-## Authentication Mechanism
+## Access policy
 
-1. **Client-side Authentication**: The mobile app authenticates with Firebase.
-2. **ID Token Acquisition**: After successful login, the client retrieves a Firebase ID Token.
-3. **API Request**: The client includes the ID Token in the request header:
+Target v1:
 
-   ```http
-   Authorization: Bearer <FIREBASE_ID_TOKEN>
-   ```
+| Path | Access |
+|---|---|
+| `/health/live` | Public, minimal |
+| `/health/ready` | Deployment/operations policy |
+| `/api/v1/**` | Valid Firebase Bearer token unless explicitly documented |
+| diagnostics | Operations role/identity only |
 
-4. **Backend Verification**:
-   - The `FirebaseAuthenticationFilter` intercepts the request.
-   - It extracts the token and uses `FirebaseAuthService` (Firebase Admin SDK) to verify it.
-   - If valid, a `FirebaseAuthenticationToken` is created and stored in the Spring `SecurityContext`.
-   - The principal is a `FirebaseUser` object containing UID, email, and claims.
-   - If invalid or missing (for protected endpoints), `401 Unauthorized` is returned.
+The prototype currently exposes `/actuator/health` and `/actuator/info` publicly and protects other routes.
 
-5. **User Provisioning**: On `GET /api/me`, `UserService.getOrCreateUser()` creates a Firestore user record if one does not exist for the Firebase UID.
+## Local behavior
 
-## Protected Endpoints
+The explicit `local` profile may accept a deterministic test token through a mock verifier. It must be impossible for `dev`, `prod`, or an unset profile to create that verifier. Add profile-wiring tests before template v1.
 
-By default, all endpoints require authentication, except:
+When using Firebase emulators, keep emulator configuration explicit and verify the process cannot accidentally use production credentials at the same time.
 
-- `GET /actuator/health`
-- `GET /actuator/info`
+## Token refresh contract
 
-Admin endpoints (all other `/actuator/**` paths) require the `ADMIN` role with HTTP Basic authentication.
+On `401`, the mobile client may force-refresh the ID token and retry once. A second `401` ends the session. The backend never asks the client to retry indefinitely.
 
-## MVP Endpoints
+| Status | Meaning |
+|---|---|
+| `401` | Missing, malformed, expired, invalid, revoked/disabled per policy |
+| `403` | Identity valid but action/resource not permitted |
 
-| Endpoint | Auth required |
-|----------|---------------|
-| `GET /actuator/health` | No |
-| `GET /actuator/info` | No |
-| `GET /api/me` | Yes (Bearer) |
-| `POST /api/chat` | Yes (Bearer) |
+Both use the standard JSON error envelope and correlation ID.
 
-## Configuration
+## Claims and roles
 
-Firebase initialization is handled in `FirebaseConfig`. It uses Google Application Default Credentials (ADC).
+Custom claims can map to server roles, but token presence is not sufficient for resource ownership. Keep role names allow-listed; do not accept arbitrary claim strings as authorities. Document claim refresh delay and admin assignment/revocation flow before relying on roles.
 
-For local development, set:
+## User provisioning
 
-```bash
-export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.gcp/starter-dev-sa.json"
-```
+`GET /api/v1/me` creates the starter user record from verified identity when absent. Creation must be idempotent under concurrent requests. Decide explicitly whether later token changes update email/display name; do not silently overwrite user-managed fields.
 
-### Local profile (mocks)
+## Required tests
 
-With `spring.profiles.active=local`, `MockFirebaseAuthService` accepts any Bearer token and returns a fixed mock user. No Firebase connection required.
-
-### Auth emulator
-
-For `dev-local` with Firebase Auth emulator:
-
-```bash
-export FIREBASE_AUTH_EMULATOR_HOST=localhost:9099
-```
-
-### Disabling Firebase in tests
-
-```yaml
-firebase:
-  enabled: false
-```
-
-Mock `FirebaseAuthService` in integration tests.
-
-## Error Handling
-
-| Status | Cause |
-|--------|-------|
-| `401 Unauthorized` | Token missing, expired, or invalid |
-| `403 Forbidden` | Authenticated but not authorized (rare in MVP) |
-
-Response body contains a brief error message. Mobile client should refresh token on 401 and retry once before signing out.
-
-## Mobile integration
-
-See [starter-mobile/docs/BACKEND_INTEGRATION.md](../../starter-mobile/docs/BACKEND_INTEGRATION.md).
-
-## Related docs
-
-- [SECURITY.md](./SECURITY.md)
-- [DATABASE.md](./DATABASE.md) — user record created on first `/api/me`
+- Missing/malformed/invalid token -> standard `401`
+- Valid token -> principal contains expected UID
+- `local` mock cannot load in `dev`/`prod` or no-profile startup
+- Role/claim mapping rejects unexpected values
+- User A cannot access user B's resource in an example extension test
+- Client refreshes/retries once and then signs out

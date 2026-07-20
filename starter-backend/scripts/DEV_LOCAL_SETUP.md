@@ -1,89 +1,47 @@
-# DEV Local Profile Setup Guide
+# DEV-Local Setup
 
-Setup for the `dev-local` profile: real DEV Firestore and OpenRouter from your IDE, with optional Firebase Auth emulator.
+`dev-local` runs the JVM on a developer machine with real DEV Firestore/Firebase/AI. It can spend money and modify shared DEV data.
 
-## What dev-local uses
+## Prerequisites
 
-| Service | Implementation |
-|---------|----------------|
-| Firestore | Real (`starter-dev`) |
-| Firebase Auth | Emulator (`localhost:9099`) or real |
-| AI / OpenRouter | Real API |
-| Cloud Storage | Not used in starter MVP |
+- DEV cloud project provisioned
+- Developer granted only required DEV access
+- Application Default Credentials configured outside the repo
+- DEV AI provider key with limits
 
----
-
-## One-time setup
-
-### 1. Complete DEV GCP setup
-
-Follow [COMMON_GCP_SETUP.md](./COMMON_GCP_SETUP.md) for `starter-dev`.
-
-### 2. Download service account key
+Prefer:
 
 ```bash
-mkdir -p ~/.gcp
-gcloud iam service-accounts keys create ~/.gcp/starter-dev-sa.json \
-  --iam-account=starter-api@starter-dev.iam.gserviceaccount.com \
-  --project=starter-dev
+gcloud auth application-default login
+gcloud config set project starter-dev
 ```
 
-**Security:** Never commit this file. Add to `.gitignore`.
+If organization policy requires a credentials file, store it outside the repository and rotate it. Do not create/download broad runtime keys casually.
 
----
-
-## Daily workflow
-
-### Step 1: Start Firebase Auth emulator (recommended)
+## Start
 
 ```bash
+export SPRING_PROFILES_ACTIVE=dev-local
+export GCP_PROJECT_ID=starter-dev
+export OPENAI_API_KEY=your-dev-provider-key
+./mvnw spring-boot:run
+```
+
+Optional Firebase Auth emulator:
+
+```bash
+export FIREBASE_AUTH_EMULATOR_HOST=localhost:9099
 firebase emulators:start --project starter-dev --only auth
 ```
 
-### Step 2: Set environment variables
+Use a token actually issued by the selected real Firebase project or emulator. The mock arbitrary-token behavior belongs only to `local`.
 
-```bash
-export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.gcp/starter-dev-sa.json"
-export GCP_PROJECT_ID="starter-dev"
-export FIREBASE_AUTH_EMULATOR_HOST="localhost:9099"
-export OPENAI_API_KEY="sk-or-v1-..."
-```
+## Safety checklist
 
-### Step 3: Run application
+- [ ] Project ID contains the expected DEV slug
+- [ ] No PROD credentials/keys are present in the shell/IDE run config
+- [ ] Provider key has DEV budget/limits
+- [ ] Logs do not contain tokens/prompts/replies
+- [ ] Test data can be safely deleted
 
-**IntelliJ:**
-
-- VM options: `-Dspring.profiles.active=dev-local`
-- Environment variables: exports above
-
-**Terminal:**
-
-```bash
-./mvnw spring-boot:run -Dspring-boot.run.profiles=dev-local
-```
-
-### Step 4: Test endpoints
-
-```bash
-# Use token from Firebase emulator or test script
-curl -H "Authorization: Bearer test-token" http://localhost:8080/api/me
-curl -X POST -H "Authorization: Bearer test-token" \
-  -H "Content-Type: application/json" \
-  -d '{"message":"hello"}' \
-  http://localhost:8080/api/chat
-```
-
----
-
-## Troubleshooting
-
-| Issue | Fix |
-|-------|-----|
-| Firestore permission denied | Check SA has `roles/datastore.user` |
-| Firebase auth fails | Confirm emulator running or use real Firebase |
-| OpenRouter 401 | Verify `OPENAI_API_KEY` |
-
-## Related docs
-
-- [INTEGRATION_ENV_CONFIG.md](./INTEGRATION_ENV_CONFIG.md)
-- [DEV_SETUP.md](./DEV_SETUP.md)
+See [environment configuration](./INTEGRATION_ENV_CONFIG.md) and [DEV bootstrap](./DEV_SETUP.md).

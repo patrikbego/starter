@@ -1,254 +1,167 @@
-# Starter Mobile CI/CD and Deployment Plan
+# Mobile CI/CD and Release
 
-## 1. Goal
+## Goal
 
-CI/CD plan for the starter mobile app (Expo / React Native).
+Keep development feedback fast while ensuring the binary released to users is the same store-signed artifact tested through App Store/Play testing. The mobile repository owns its workflows and store credentials independently of the backend repository.
 
-```text
-Developer pushes code
-   -> CI runs lint and typecheck
-   -> automatic EAS build for DEV (internal distribution)
-   -> test against DEV backend
-   -> manually promote same build to PROD store tracks
+## Artifact types
+
+| Artifact | EAS profile | Config | Purpose | Store-promotable |
+|---|---|---|---|---|
+| Development client | `development` | DEV/local | Developer tooling | No |
+| Preview/internal build | `preview` | DEV | Fast stakeholder QA | No |
+| Store release candidate | `production` | PROD | TestFlight/Play testing, then release | Yes |
+
+Expo documents that internal preview builds differ from production builds in signing/packaging, while production builds are used for store release or store-managed testing. See [Configure EAS Build with eas.json](https://docs.expo.dev/build/eas-json/) and [distribution overview](https://docs.expo.dev/distribution/introduction/).
+
+## Pipeline
+
+```mermaid
+flowchart LR
+  PR["Pull request"] --> CI["lint + typecheck + tests + contract/config checks"]
+  CI --> Main["Merge to main"]
+  Main --> Preview["DEV preview build"]
+  Main --> Tag["Reviewed release tag/dispatch"]
+  Tag --> StoreBuild["One production store build per platform"]
+  StoreBuild --> Test["TestFlight / Play internal testing"]
+  Test --> Approval["Release approval"]
+  Approval --> Release["Release the same store binary"]
 ```
 
-Matches backend **DEV auto / PROD manual** discipline.
-
-### Assumptions
-
-- Expo SDK 54
-- EAS Build and EAS Submit
-- EAS Update for JS-only fixes (where compatible)
-- Firebase Authentication (separate DEV / PROD projects)
-- Spring Boot API on Cloud Run (DEV / PROD)
-- GitHub Actions for CI and EAS triggers (workflows at monorepo root, `paths: starter-mobile/**`)
-
-**Related:** [mobile_architecture_plan.md](./mobile_architecture_plan.md), [starter-backend CI/CD](../starter-backend/docs/cicd_deployment_plan.md).
-
-### 1.1 Implementation Status
-
-| Item | Status |
-|------|--------|
-| Documentation | Complete |
-| `eas.json` | Implemented |
-| `app.config.ts` | Implemented |
-| `.github/workflows/ci-mobile.yml` | Implemented |
-| `.github/workflows/eas-build-dev.yml` | Implemented |
-| `.github/workflows/eas-submit-prod.yml` | Implemented |
-
----
-
-## 2. Environment Strategy
-
-### DEV
-
-- Fast iteration and QA
-- Integration with DEV Cloud Run API
-- Firebase `starter-dev` project
-- Internal testers (EAS internal, TestFlight internal, Play internal)
-
-### PROD
-
-- App Store / Google Play
-- Firebase `starter-prod` project
-- Production API URL
-- Manual submit after DEV validation
-
-Staging is optional and not required for MVP.
-
----
-
-## 3. Branching Strategy
+## Repository workflows
 
 ```text
-main
-feature/*
+.github/workflows/
+├── ci.yml
+├── build-preview.yml
+├── build-release.yml
+├── submit-release.yml
+└── publish-update.yml       # optional
 ```
 
-```text
-feature branch → PR → merge to main → CI + DEV EAS build → test → manual PROD submit
-```
+### `ci.yml`
 
----
+Trigger: pull requests and pushes to `main`.
 
-## 4. Build Once, Promote Same Build
+Required checks:
 
-The EAS build tested in DEV is submitted to PROD — do not create a separate production build with unverified changes.
+1. Pin Node and use `npm ci`.
+2. `npm run lint`.
+3. `npx tsc --noEmit`.
+4. Unit/component tests.
+5. Expo Doctor or equivalent compatibility check.
+6. Validate the pinned backend contract/generated types.
+7. Evaluate build configuration for DEV and PROD with non-secret fixtures; assert mixed/missing values fail.
 
-Record per release:
+### `build-preview.yml`
 
-```text
-commit SHA
-EAS build ID
-platform (ios / android)
-submitter
-timestamp
-```
+Trigger: merge to `main` or manual dispatch.
 
----
+- Uses EAS `preview` and the DEV EAS environment.
+- Produces internal-distribution artifacts for QA.
+- Records commit and EAS build IDs.
+- Never submits to public store release.
 
-## 5. EAS Configuration (planned)
+Use concurrency/cancellation to avoid paying for stale queued preview builds when appropriate.
 
-### 5.1 `eas.json`
+### `build-release.yml`
+
+Trigger: protected release tag or manual dispatch from a reviewed commit.
+
+- Uses EAS `production` and the production EAS environment.
+- Fails if API URL/Firebase project/app IDs are not production values.
+- Creates store-signed iOS and Android artifacts once.
+- Records commit, EAS build IDs, versions/build numbers, contract version, and runtime version.
+
+### `submit-release.yml`
+
+Trigger: manual, using the recorded production build IDs.
+
+- Uses a protected GitHub production environment.
+- Uploads the existing store artifacts; it does not rebuild.
+- Starts in TestFlight/internal testing and Play internal testing.
+- Public/phased release occurs only after device validation and approval.
+
+EAS Submit uploads a binary but store release status is still controlled by App Store Connect/Play Console policies.
+
+## EAS configuration principles
+
+Keep `eas.json` free of real environment values when possible. Select named EAS environments and validate them in `app.config.ts`.
+
+Conceptual profiles:
 
 ```json
 {
-  "cli": {
-    "version": ">= 16.0.0",
-    "appVersionSource": "remote"
-  },
   "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "env": { "APP_ENV": "development" }
+      "environment": "development"
     },
     "preview": {
       "distribution": "internal",
-      "env": { "APP_ENV": "development" }
+      "environment": "preview"
     },
     "production": {
-      "autoIncrement": true,
-      "env": { "APP_ENV": "production" }
-    }
-  },
-  "submit": {
-    "production": {
-      "ios": { "ascAppId": "REPLACE_ME" },
-      "android": { "track": "internal" }
+      "distribution": "store",
+      "environment": "production",
+      "autoIncrement": true
     }
   }
 }
 ```
 
-### 5.2 `app.config.ts`
+Use the exact schema supported by the pinned EAS CLI; the example expresses policy rather than a copy-paste guarantee.
 
-See [mobile_architecture_plan.md](./mobile_architecture_plan.md) § Environment Configuration.
+## Backend coordination
 
-Runtime access:
+Independent releases require compatibility discipline:
 
-```typescript
-import Constants from 'expo-constants';
-const { apiBaseUrl, appEnv, firebase } = Constants.expoConfig?.extra ?? {};
-```
+- Mobile declares the backend contract version it supports.
+- Backend maintains compatibility with the currently released store app.
+- Breaking backend changes use a new API version and coexist through the mobile adoption window.
+- A mobile production candidate points at PROD configuration. Deploy compatible backend PROD before final device validation, using backward-compatible changes.
+- DEV preview validates upcoming integration against DEV but is not the production artifact.
 
----
+## EAS Update
 
-## 6. GitHub Actions Workflows (planned)
+OTA updates are optional. If enabled:
 
-### 6.1 GitHub Actions workflows (monorepo root)
+- define `runtimeVersion` policy explicitly;
+- separate preview and production channels/branches;
+- publish only compatible JavaScript/assets to a runtime;
+- protect production update publication;
+- record update group/runtime/commit;
+- test rollback/republish behavior;
+- require a new native build for native dependency/config/plugin changes.
 
-Workflows live at `.github/workflows/` in the repository root. Use path filters:
+OTA is a release mechanism, not a way to bypass review for risky changes.
 
-```yaml
-on:
-  push:
-    paths:
-      - 'starter-mobile/**'
-```
+## Versioning
 
-### 6.2 `ci.yml`
+- Use remote app version/build-number ownership consistently.
+- Tag release source after/with the release record.
+- Record separate iOS/Android build IDs if one platform is rebuilt.
+- Rebuilding one platform creates a new artifact that requires testing; do not reuse the other platform's approval blindly.
 
-Trigger: pull request and push to `main`
+## Rollback
 
-```yaml
-# working-directory: starter-mobile
-steps:
-  - npm ci
-  - npx expo lint
-  - npx tsc --noEmit
-```
+| Failure | Response |
+|---|---|
+| Preview regression | Build a new preview; no user impact |
+| Bad production OTA | Roll back/republish last known-good compatible update |
+| Bad phased store release | Halt rollout; retain compatible backend; prepare fixed build |
+| Backend regression | Roll back backend digest while preserving contract compatibility |
 
-### 6.3 `eas-build-dev.yml`
+Mobile binaries already installed on user devices cannot be instantly removed. Backend backward compatibility and server-side kill switches for dangerous optional features are therefore important.
 
-Trigger: push to `main`
+## Acceptance criteria
 
-```yaml
-steps:
-  - uses: expo/expo-github-action@v8
-    with:
-      eas-version: latest
-      token: ${{ secrets.EXPO_TOKEN }}
-  - run: eas build --profile preview --platform all --non-interactive
-```
-
-### 6.4 `eas-submit-prod.yml`
-
-Trigger: `workflow_dispatch` with `build_id` input
-
-```yaml
-environment: production
-steps:
-  - run: eas submit --platform all --id ${{ inputs.build_id }} --non-interactive
-```
-
----
-
-## 7. Secrets
-
-### GitHub repository secrets
-
-| Secret | Description |
-|--------|-------------|
-| `EXPO_TOKEN` | Expo access token |
-
-### EAS environment variables (per profile)
-
-| Variable | DEV | PROD |
-|----------|-----|------|
-| `APP_ENV` | `development` | `production` |
-| `API_BASE_URL_DEV` | DEV Cloud Run URL | — |
-| `API_BASE_URL_PROD` | — | PROD Cloud Run URL |
-| `EXPO_PUBLIC_FIREBASE_API_KEY` | DEV key | PROD key |
-| `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN` | DEV domain | PROD domain |
-| `EXPO_PUBLIC_FIREBASE_PROJECT_ID` | `starter-dev` | `starter-prod` |
-
-Set via EAS dashboard or `eas env:create`.
-
----
-
-## 8. OTA Updates (EAS Update)
-
-Use for JS-only fixes without store review.
-
-**Requires new native build when:**
-
-- Firebase SDK version changes
-- New native modules added
-- Expo SDK upgrade
-
----
-
-## 9. Backend Coordination
-
-Before PROD mobile submit:
-
-1. DEV build tested against DEV API (`/api/me`, `/api/chat`)
-2. Backend PROD deployed (manual workflow)
-3. Update EAS production env with PROD API URL
-4. Submit **same build ID** tested in DEV (if API contract unchanged)
-
-If backend PROD has breaking changes, create new build after backend PROD deploy.
-
----
-
-## 10. Rollback
-
-### Store rollback
-
-- iOS: remove version from sale or expedite fix build
-- Android: halt rollout in Play Console
-
-### OTA rollback
-
-```bash
-eas update:rollback
-```
-
----
-
-## Related docs
-
-- [BACKEND_INTEGRATION.md](./BACKEND_INTEGRATION.md)
-- [../../docs/ENVIRONMENT_MATRIX.md](../../docs/ENVIRONMENT_MATRIX.md)
-- [../../docs/NEW_APP_WORKFLOW.md](../../docs/NEW_APP_WORKFLOW.md)
+- [ ] CI passes from a clean install
+- [ ] Preview build contains only DEV endpoint/project identifiers
+- [ ] Production build contains only PROD endpoint/project identifiers
+- [ ] Preview build is never passed to store submission
+- [ ] Submission uses recorded production build IDs without rebuilding
+- [ ] Store candidate passes login, `/me`, AI, refresh, and sign-out on real devices
+- [ ] Contract version and backend compatibility are recorded
+- [ ] OTA/native rollback procedures have been exercised

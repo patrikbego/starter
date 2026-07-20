@@ -1,121 +1,56 @@
-# Starter Integration & Environment Configuration Guide
+# Backend Environment Configuration
 
-Environment variables and configuration for each Spring Boot profile.
+## Profiles
 
----
+| Profile | Auth | Data | AI | Intended location |
+|---|---|---|---|---|
+| `local` | Mock | In-memory mock | Deterministic mock | Developer machine only |
+| `dev-local` | DEV real/emulator | DEV Firestore | DEV provider | Developer machine |
+| `dev` | DEV real | DEV Firestore | DEV provider | DEV Cloud Run |
+| `prod` | PROD real | PROD Firestore | PROD provider | PROD Cloud Run |
 
-## Environment Variables by Profile
+Target v1 requires an explicit profile. The current prototype has `local` as a default; remove that default before deployment use.
 
-### `local` Profile (Full Offline Development)
+## Current prototype variables
 
-**No secrets required.** Mocks and emulators with defaults.
+| Variable | Profiles | Purpose |
+|---|---|---|
+| `GCP_PROJECT_ID` | `dev-local`, `dev`, `prod` | Firestore/Firebase project |
+| `GOOGLE_APPLICATION_CREDENTIALS` | `dev-local` when not using other ADC | Local credentials outside repo |
+| `FIREBASE_AUTH_EMULATOR_HOST` | local/dev-local testing | Firebase Auth emulator |
+| `OPENAI_API_KEY` | non-local | OpenAI-compatible provider key |
+| `STARTER_CORS_ALLOWED_ORIGINS` | cloud | Browser origins |
+| `ACTUATOR_PASSWORD` | cloud | Prototype admin Basic auth |
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `FIRESTORE_EMULATOR_HOST` | No | `localhost:8080` | Firestore emulator |
-| `FIREBASE_AUTH_EMULATOR_HOST` | No | `localhost:9099` | Firebase Auth emulator |
-| `LOCAL_AI_URL` | No | `http://localhost:8081/v1` | Mock AI endpoint (unused if MockAiChatAdapter) |
-| `GOOGLE_CLOUD_PROJECT` | No | `starter-local` | Emulator project ID |
+## Target additions/changes
 
----
+- Remove production/local defaults for required values.
+- Rename the configuration prefix/environment variable when creating a product.
+- Add validated `AI_MODEL`, request timeout, rate, concurrency, and budget configuration.
+- Reject wildcard production CORS.
+- Validate the GCP/Firebase project matches the profile/environment.
+- Keep provider keys and operation credentials in Secret Manager.
+- Prefer dedicated health endpoints and operator identity over exposing general actuator metadata.
 
-### `dev-local` Profile (Real Cloud from IntelliJ)
+## Local
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `GOOGLE_APPLICATION_CREDENTIALS` | Yes | Path to service account JSON |
-| `GCP_PROJECT_ID` | No | Defaults to `starter-dev` |
-| `OPENAI_API_KEY` | Yes | OpenRouter API key |
-| `FIREBASE_AUTH_EMULATOR_HOST` | No | Set to `localhost:9099` to use auth emulator |
-
-Optional:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ACTUATOR_PASSWORD` | (empty) | Admin actuator password |
-
----
-
-### `dev` Profile (Cloud Run DEV)
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `SPRING_PROFILES_ACTIVE` | Yes | `dev` |
-| `GCP_PROJECT_ID` | Yes | `starter-dev` |
-| `STARTER_CORS_ALLOWED_ORIGINS` | Yes | `*` or specific origins |
-
-**Secrets (Secret Manager):**
-
-| Secret name | Env var |
-|-------------|---------|
-| `openai-api-key` | `OPENAI_API_KEY` |
-| `actuator-password` | `ACTUATOR_PASSWORD` |
-
----
-
-### `prod` Profile (Cloud Run PROD)
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `SPRING_PROFILES_ACTIVE` | Yes | `prod` |
-| `GCP_PROJECT_ID` | Yes | `starter-prod` |
-| `STARTER_CORS_ALLOWED_ORIGINS` | Yes | Specific allowed origins |
-
-**Secrets:** Same as `dev` with production values.
-
----
-
-## Integration by Profile
-
-### `local`
-
-| Integration | Implementation |
-|-------------|----------------|
-| Firebase Auth | `MockFirebaseAuthService` |
-| Firestore | `MockUserRepositoryAdapter` (in-memory) |
-| AI | `MockAiChatAdapter` |
-| CORS | Permissive (`localhost`) |
-| Logging | Console, plain text |
-
-### `dev-local`
-
-| Integration | Implementation |
-|-------------|----------------|
-| Firebase Auth | Real or emulator |
-| Firestore | Real `starter-dev` |
-| AI | Real OpenRouter |
-| Logging | Console, plain text |
-
-### `dev` / `prod`
-
-| Integration | Implementation |
-|-------------|----------------|
-| Container | Cloud Run |
-| Firebase Auth | Real |
-| Firestore | Real |
-| AI | OpenRouter via Secret Manager |
-| CORS | Configurable |
-| Actuator | HTTP Basic (`admin` / password) |
-| Logging | JSON (Cloud Logging) |
-
----
-
-## Custom configuration namespace
-
-Planned `starter.*` properties in YAML:
-
-```yaml
-starter:
-  cors:
-    allowed-origins: ${STARTER_CORS_ALLOWED_ORIGINS:*}
-  chat:
-    max-message-length: 4000
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
----
+No cloud/provider credentials are required. Emulator variables do not automatically replace the current in-memory repository adapter.
 
-## Related docs
+## DEV local
 
-- [DEV_LOCAL_SETUP.md](./DEV_LOCAL_SETUP.md)
-- [COMMON_GCP_SETUP.md](./COMMON_GCP_SETUP.md)
-- [../../docs/ENVIRONMENT_MATRIX.md](../../docs/ENVIRONMENT_MATRIX.md)
+```bash
+export SPRING_PROFILES_ACTIVE=dev-local
+export GCP_PROJECT_ID=starter-dev
+export OPENAI_API_KEY=your-dev-key
+./mvnw spring-boot:run
+```
+
+Use developer ADC or an external credentials file. A real or emulator-issued Firebase ID token is required; an arbitrary `test-token` works only in the explicit `local` mock profile.
+
+## Cloud
+
+Cloud Run sets `SPRING_PROFILES_ACTIVE=dev|prod`, project/region configuration, and Secret Manager references. Missing values stop startup in target v1.
