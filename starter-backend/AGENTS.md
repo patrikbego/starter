@@ -20,7 +20,7 @@ A generic backend starter kit for mobile-first applications. It provides authent
 
 3. **Security by Default** - Every protected request verifies Firebase tokens. Scope data by `userId` when adding domain resources.
 
-## Project Structure (planned)
+## Project Structure
 
 ```
 src/main/java/com/starter/
@@ -49,15 +49,11 @@ src/main/resources/
 - `@Profile("local")` - Mocks: `MockFirebaseAuthService`, `MockUserRepositoryAdapter`, `MockAiChatAdapter`
 - `@Profile("!local")` - Real: `FirebaseAuthServiceImpl`, `FirestoreUserRepositoryAdapter`, `SpringAiOpenRouterAdapter`
 
-## How to Run (after implementation)
+## How to Run
 
 ### Local Profile (`local`) - Full Offline Development
 
 ```bash
-firebase emulators:start --only auth,firestore
-export FIRESTORE_EMULATOR_HOST=localhost:8080
-export FIREBASE_AUTH_EMULATOR_HOST=localhost:9099
-export GOOGLE_CLOUD_PROJECT=starter-local
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 ```
 

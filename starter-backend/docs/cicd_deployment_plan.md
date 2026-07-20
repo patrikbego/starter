@@ -33,10 +33,10 @@ The goal is to keep deployment simple, fast, and cheap during early development 
 | Item | Status |
 |------|--------|
 | Documentation | Complete |
-| GitHub Actions `deploy-dev.yml` on push to `main` | Planned |
-| Manual `deploy-prod.yml` | Planned |
-| Single Cloud Run service per env (`starter-api-dev` / `starter-api-prod`) | Planned |
-| Workload Identity Federation for GitHub | Planned |
+| GitHub Actions `deploy-dev-backend.yml` on push to `main` | Implemented |
+| Manual `deploy-prod-backend.yml` | Implemented |
+| Single Cloud Run service per env (`starter-api-dev` / `starter-api-prod`) | Implemented |
+| Workload Identity Federation for GitHub | Documented (setup in COMMON_GCP_SETUP) |
 | Terraform/OpenTofu in repo | Not planned for MVP |
 
 ---

@@ -1,0 +1,48 @@
+# DEV Local Development Profile
+# Run from IntelliJ but connect to real DEV cloud services
+# Use with: -Dspring.profiles.active=dev-local
+#
+# Required environment variables:
+#   export GOOGLE_APPLICATION_CREDENTIALS=/path/to/starter-dev-sa.json
+#   export GCP_PROJECT_ID=starter-dev
+#   export OPENAI_API_KEY=sk-or-v1-...
+#
+# Optional (for Firebase Auth emulator):
+#   export FIREBASE_AUTH_EMULATOR_HOST=localhost:9099
+
+spring:
+  config:
+    activate:
+      on-profile: dev-local
+
+  cloud:
+    gcp:
+      project-id: ${GCP_PROJECT_ID:starter-dev}
+      firestore:
+        enabled: true
+
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      base-url: https://openrouter.ai/api/v1
+      chat:
+        options:
+          model: openai/gpt-4o-mini
+          temperature: 0.7
+
+firebase:
+  enabled: true
+  emulator:
+    host: ${FIREBASE_AUTH_EMULATOR_HOST:}
+
+starter:
+  cors:
+    allowed-origins: http://localhost:8081,http://localhost:19006
+
+spring.security.user:
+  name: admin
+  password: admin
+
+logging:
+  level:
+    com.starter: DEBUG

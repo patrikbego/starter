@@ -1,0 +1,41 @@
+# Local Development Profile
+# Run entirely offline with mocks
+# Use with: -Dspring.profiles.active=local
+#
+# Optional emulator support:
+#   export FIRESTORE_EMULATOR_HOST=localhost:8080
+#   export FIREBASE_AUTH_EMULATOR_HOST=localhost:9099
+#   export GOOGLE_CLOUD_PROJECT=starter-local
+
+spring:
+  config:
+    activate:
+      on-profile: local
+
+  autoconfigure:
+    exclude:
+      - com.google.cloud.spring.autoconfigure.core.GcpContextAutoConfiguration
+      - com.google.cloud.spring.autoconfigure.firestore.GcpFirestoreAutoConfiguration
+
+  ai:
+    openai:
+      api-key: sk-local-mock-key
+      base-url: ${LOCAL_AI_URL:http://localhost:8081/v1}
+      chat:
+        options:
+          model: openai/gpt-4o-mini
+          temperature: 0.7
+
+firebase:
+  enabled: true
+  emulator:
+    host: ${FIREBASE_AUTH_EMULATOR_HOST:localhost:9099}
+
+starter:
+  cors:
+    allowed-origins: http://localhost:8081,http://localhost:19006
+
+logging:
+  level:
+    com.starter: DEBUG
+    org.springframework.security: DEBUG
