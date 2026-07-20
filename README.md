@@ -52,4 +52,4 @@ See [docs/README.md](./docs/README.md).
 
 **Backend MVP implemented** — Spring Boot API with auth, `/api/me`, `/api/chat`, Docker, and GitHub Actions CI/CD in `starter-backend/`.
 
-**Mobile** — docs phase; Expo app code will follow.
+**Mobile MVP implemented** — Expo SDK 54 app with Firebase Auth, home (`/api/me` + health), chat (`/api/chat`), and GitHub Actions + EAS CI/CD in `starter-mobile/`.

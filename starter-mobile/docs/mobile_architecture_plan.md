@@ -18,14 +18,14 @@ The backend APIs and infrastructure are defined in [starter-backend](../starter-
 
 | Component | Status |
 |-----------|--------|
-| Documentation | Complete (docs phase) |
-| Expo project scaffold | Planned |
-| Firebase Auth | Planned |
-| API client + TanStack Query | Planned |
-| Auth gate + login screen | Planned |
-| Home + chat screens | Planned |
-| `app.config.ts` / EAS profiles | Planned |
-| GitHub Actions + `eas.json` | Planned |
+| Documentation | Complete |
+| Expo project scaffold | Implemented |
+| Firebase Auth | Implemented |
+| API client + TanStack Query | Implemented |
+| Auth gate + login screen | Implemented |
+| Home + chat screens | Implemented |
+| `app.config.ts` / EAS profiles | Implemented |
+| GitHub Actions + `eas.json` | Implemented |
 
 ---
 
@@ -222,16 +222,16 @@ export default {
 
 ### Phase 1: Foundation (starter MVP)
 
-- [ ] Expo project with expo-router
-- [ ] `app.config.ts` with env-driven `apiBaseUrl`
-- [ ] Firebase Auth adapter + AuthProvider
-- [ ] HttpApiClient with Bearer injection
-- [ ] TanStack Query provider
-- [ ] Login screen
-- [ ] Home screen (`/api/me` + health)
-- [ ] Chat screen (`/api/chat`)
-- [ ] Auth gate in root layout
-- [ ] `eas.json` + GitHub Actions CI
+- [x] Expo project with expo-router
+- [x] `app.config.ts` with env-driven `apiBaseUrl`
+- [x] Firebase Auth adapter + AuthProvider
+- [x] HttpApiClient with Bearer injection
+- [x] TanStack Query provider
+- [x] Login screen
+- [x] Home screen (`/api/me` + health)
+- [x] Chat screen (`/api/chat`)
+- [x] Auth gate in root layout
+- [x] `eas.json` + GitHub Actions CI
 
 ### Phase 2: Extensions (per product)
 
