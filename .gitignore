@@ -3,3 +3,8 @@
 *.iml
 .vscode/
 .DS_Store
+
+# Independent child repositories (extracted during Phase 1).
+# Each is its own Git repository; the parent workspace no longer tracks them.
+starter-backend/
+starter-mobile/
