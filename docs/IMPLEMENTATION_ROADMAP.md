@@ -2,26 +2,30 @@
 
 This roadmap starts from the current prototype. Complete phases in order; later phases assume earlier boundaries are stable.
 
+Checkbox legend: `[x]` complete · `[~]` partially complete (note explains the remainder) · `[ ]` not started. Status updated 2026-08-17 after Phase 1.
+
 ## Phase 0 — documentation baseline
 
 - [x] Define two-repository ownership
 - [x] Define target architecture and environment model
 - [x] Correct backend and mobile promotion concepts
 - [x] Record the prototype gaps
-- [ ] Approve repository names, GitHub organization, and history strategy
+- [~] Approve repository names, GitHub organization, and history strategy — history strategy settled (per-repository `git subtree split` preserving full history); repository names and GitHub organization still to approve before pushing
 
 Exit: architecture and ownership are accepted before code is moved.
 
 ## Phase 1 — repository extraction
 
-- [ ] Create independent backend and mobile Git repositories
-- [ ] Move each workflow to its owning repository root
-- [ ] Remove monorepo path filters and `working-directory` assumptions
-- [ ] Fix all docs so standalone clones have no sibling-path dependency
-- [ ] Add branch protection, CODEOWNERS, Dependabot/Renovate, and secret scanning
-- [ ] Verify clean clones on supported developer platforms
+- [x] Create independent backend and mobile Git repositories — done locally as nested repos (`starter-backend`, `starter-mobile`, own `.git` on `main`) with full history preserved via `git subtree split`
+- [x] Move each workflow to its owning repository root — backend: `ci.yml`, `deploy-dev.yml`, `deploy-prod.yml`; mobile: `ci.yml`, `eas-build-dev.yml`, `eas-submit-prod.yml`
+- [x] Remove monorepo path filters and `working-directory` assumptions — all `paths:` filters, `working-directory`, and the monorepo `cache-dependency-path` removed; mobile CI switched from `npx expo lint` (broken on this toolchain) to `npx eslint .`
+- [x] Fix all docs so standalone clones have no sibling-path dependency — verified: children contain no `../starter-backend`/`../starter-mobile` links; cross-repo coordination docs stay with the parent index
+- [~] Add branch protection, CODEOWNERS, Dependabot/Renovate, and secret scanning — `/.github/CODEOWNERS` and `/.github/dependabot.yml` added to both repos plus repository-settings guidance in each README; branch protection, Dependabot alerts, and secret scanning/push protection are GitHub settings that activate only after each repo is pushed and configured
+- [x] Verify clean clones on supported developer platforms — fresh clones verified: backend `./mvnw test -B` passes (14 tests, 0 failures); mobile `npm ci` + `npx tsc --noEmit` + `npx eslint .` pass
 
 Exit: both repositories run their CI independently.
+
+> Status note: extraction and local verification are complete. The remaining Phase 1 tail is hosting: create the two GitHub repositories, push `main`, enable the settings listed in each README ("Repository settings (enable after first push)"), and only after that does CI actually run on the platform.
 
 ## Phase 2 — contract and configuration safety
 
