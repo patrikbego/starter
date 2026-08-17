@@ -5,6 +5,7 @@ These documents coordinate the backend and mobile templates while they are devel
 | Document | Purpose |
 |---|---|
 | [REVIEW_FINDINGS.md](./REVIEW_FINDINGS.md) | Evidence-based review of the current prototype and priority gaps |
+| [ARCHITECTURE_CHECKS.md](./ARCHITECTURE_CHECKS.md) | Quality-attribute checklist (94 NFR terms) with coverage status per template |
 | [ARCHITECTURE_OVERVIEW.md](./ARCHITECTURE_OVERVIEW.md) | Target system boundaries and shared design principles |
 | [REPOSITORY_STRATEGY.md](./REPOSITORY_STRATEGY.md) | Why there are two repositories and how they evolve safely |
 | [ENVIRONMENT_MATRIX.md](./ENVIRONMENT_MATRIX.md) | Local, DEV, and PROD configuration across both repositories |
