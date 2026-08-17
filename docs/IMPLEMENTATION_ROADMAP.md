@@ -29,12 +29,12 @@ Exit: both repositories run their CI independently.
 
 ## Phase 2 — contract and configuration safety
 
-- [ ] Add backend `openapi/openapi.yaml` and `/api/v1` routes
-- [ ] Standardize errors and correlation IDs
-- [ ] Pin/validate the contract from mobile CI
-- [ ] Remove the backend's implicit `local` default profile
-- [ ] Validate required backend and mobile variables at startup/build time
-- [ ] Split public liveness/readiness from protected actuator diagnostics
+- [x] Add backend `openapi/openapi.yaml` and `/api/v1` routes — contract v1 at `openapi/openapi.yaml`; routes `/api/v1/me`, `/api/v1/ai/chat` replace the unversioned prototype paths
+- [x] Standardize errors and correlation IDs — one envelope (`code`, `message`, `correlationId`) across validation, AI, auth (filter/entry point), and access-denied responses
+- [x] Pin/validate the contract from mobile CI — `starter-mobile/contract/openapi.yaml` pinned copy + `npm run validate:contract` in mobile CI; backend `OpenApiContractTest` keeps spec and implementation in sync
+- [x] Remove the backend's implicit `local` default profile — no default profile; cloud profiles fail startup when a required variable is missing
+- [x] Validate required backend and mobile variables at startup/build time — strict `${VAR}` placeholders (backend) and `app.config.ts` pairing/fallback guards (mobile: PROD requires HTTPS + non-DEV project id; EAS preview requires HTTPS DEV URL)
+- [x] Split public liveness/readiness from protected actuator diagnostics — public `/health/live` + `/health/ready`; `/actuator/**` requires ADMIN; actuator env info disabled
 
 Exit: cross-repository integration is explicit and missing production configuration fails closed.
 

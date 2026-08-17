@@ -24,7 +24,7 @@ Common subsets referenced below: **agility**, **dependability**, and **securabil
 | auditability | Covered | GitHub Actions history plus release records (commit, digest, approver — see `NEW_APP_WORKFLOW.md`). |
 | autonomy | Covered | Separate repositories with independent CI/CD, secrets, and release cycles; no cross-repo imports. |
 | availability | Covered (foundation) | Cloud Run managed scaling and restarts; multi-region availability is not designed yet. |
-| compatibility | Covered (foundation) | Provider-neutral OpenAI-compatible AI port, pinned Expo/Spring versions; versioned HTTP contract is Phase 2. |
+| compatibility | Covered | Versioned HTTP contract (v1) owned by the backend and pinned+validated by mobile CI; provider-neutral OpenAI-compatible AI port; pinned Expo/Spring versions. |
 | composability | Covered | Backend ports/adapters compose cleanly; mobile feature modules sit on a thin API client. |
 | confidentiality | Covered | No server secrets in the app; Secret Manager + Workload Identity; no tokens, prompts, or PII logged. |
 | configurability | Covered | Environment-driven spring profiles; build-time-validated app config; fail-closed startup is the Phase 2 target. |
@@ -38,7 +38,7 @@ Common subsets referenced below: **agility**, **dependability**, and **securabil
 | demonstrability | Covered | Run guides walk the full starter loop (login → `/me` → AI chat) end to end. |
 | dependability | Covered | Aggregated from subsets below: availability, fault-tolerance, reliability, recoverability, resilience. |
 | deployability | Covered (foundation) | Docker + Cloud Run + EAS Build; "build once, promote" digest promotion is roadmap Phase 5. |
-| discoverability | Not yet | No published OpenAPI document or `/api/v1` routes until Phase 2; consumers read code/docs today. |
+| discoverability | Covered | Contract v1 published at `openapi/openapi.yaml`, pinned into the mobile repo, and validated in both repos' CI. |
 | distributability | Covered | Stateless backend scales horizontally on Cloud Run; mobile is distributed via app stores. |
 | durability | Covered | Firestore (managed) for user data; retention/export/restore/deletion policies not yet defined. |
 | effectiveness | Covered | The full starter loop (sign-in → `/api/me` → `/api/chat`) works end to end. |
@@ -46,7 +46,7 @@ Common subsets referenced below: **agility**, **dependability**, and **securabil
 | elasticity | Covered | Cloud Run scales on demand with per-environment `min`/`max` instances. |
 | evolvability | Covered | Layered architecture, versioned contract plan, documented extension paths. |
 | extensibility | Covered | Auth, Firestore, and AI sit behind ports; product entities/storage/search are documented extensions. |
-| failure transparency | Not yet | Fail-safe messages exist but are inconsistent (some auth paths are plain text); one unified error envelope with `correlationId` is Phase 2. |
+| failure transparency | Covered | One error envelope (`code`, `message`, `correlationId`) on every failure path including auth (filter and entry point) and access-denied responses. |
 | familiarity | Covered | Standard stack (Spring Boot, Firebase, Expo, React) with conventional structure and a small dependency surface. |
 | fault-tolerance | Covered (foundation) | Stateless server; client 401 force-refresh-and-retry-once; typed `NetworkError`. |
 | fidelity | NA | Data/behavior fidelity is product-domain — not part of the generic template contract. |
@@ -70,7 +70,7 @@ Common subsets referenced below: **agility**, **dependability**, and **securabil
 | orthogonality | Covered | Auth, persistence, AI, and delivery are independent concerns with no horizontal coupling. |
 | portability | Covered | Backend: single Docker image with profile-driven config; mobile: one codebase, two platforms. |
 | precision | Covered | Integration tests assert exact HTTP status/body; explicit DTOs. |
-| predictability | Covered (foundation) | Explicit profiles and deterministic mocks; removing the `local` default profile is Phase 2. |
+| predictability | Covered | No default profile; explicit profiles and deterministic mocks; `ConfigFailClosedTest` guards against reintroducing a default or permissive fallbacks. |
 | process capabilities | Covered | Merge-gated CI, DEV deploy, PROD approval input, release-record template. |
 | proactivity | Not yet | Alerting/SLOs and automated failure reporting are roadmap Phase 5. |
 | producibility | Covered | Products are created from tagged releases by design; end-to-end proof is Phase 6. |
@@ -94,7 +94,7 @@ Common subsets referenced below: **agility**, **dependability**, and **securabil
 | securability | Covered | Confidentiality + integrity + safety rows; hardened identity (App Check) is a P2 consideration. |
 | simplicity | Covered | Flat layering, no microservices/Kubernetes, explicit non-goals in the architecture overview. |
 | stability | Covered (foundation) | Pinned versions and lockfiles; dependency baseline upgrade is Phase 3. |
-| standards compliance | Covered | HTTP/JSON, JWTs, OpenAI-compatible surface; publishing the OpenAPI contract is Phase 2. |
+| standards compliance | Covered | HTTP/JSON, JWTs, OpenAI-compatible surface, and a published OpenAPI 3 contract that CI keeps in sync with the implementation. |
 | survivability | Not yet | No multi-region/DR topology; disaster-recovery drills are Phase 6. |
 | sustainability | NA | Energy/organizational sustainability is outside the template contract. |
 | tailorability | Covered | Tailoring per product = customizability path (rename + env config in `NEW_APP_WORKFLOW.md`). |

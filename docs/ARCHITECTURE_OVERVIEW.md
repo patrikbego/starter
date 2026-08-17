@@ -96,18 +96,16 @@ Do not reproduce backend authorization or business rules in the app. Client chec
 
 ## Integration contract
 
-Before template v1, the backend must publish an OpenAPI document and version routes under `/api/v1`. The minimum contract is:
+The backend publishes the v1 OpenAPI document and serves versioned routes under `/api/v1` (implemented in roadmap Phase 2):
 
-| Method | Target path | Purpose |
+| Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/health/live` | Process liveness; no dependency details |
 | `GET` | `/health/ready` | Readiness for deployment smoke tests |
 | `GET` | `/api/v1/me` | Authenticated current user |
 | `POST` | `/api/v1/ai/chat` | Minimal authenticated, stateless AI request |
 
-All errors use one schema containing `code`, `message`, and `correlationId`. The backend validates the OpenAPI file in CI; the mobile repository validates or generates its API types from a pinned contract version.
-
-The current prototype still uses `/actuator/health`, `/api/me`, and `/api/chat`. That is acceptable during the prototype phase, but it is not the target public contract.
+All errors use one schema containing `code`, `message`, and `correlationId`. The backend validates the OpenAPI file in CI (`OpenApiContractTest` keeps the committed `openapi/openapi.yaml` and the implementation in sync); the mobile repository pins a copy of the contract and validates it in CI (`npm run validate:contract`).
 
 ## Environment model
 
