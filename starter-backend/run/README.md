@@ -35,6 +35,7 @@ docker build -t starter-backend:local .
 ## Safety rules
 
 - Always select `local`, `dev-local`, `dev`, or `prod` explicitly.
+- Use a separate Firebase/GCP project for DEV and PROD; another Firebase app registration is not a separate environment.
 - Never use the local mock profile in Cloud Run.
 - Never commit credentials or `.env` values.
 - Do not use the current prototype production workflow as evidence of immutable promotion; see [CI/CD](../docs/cicd_deployment_plan.md).

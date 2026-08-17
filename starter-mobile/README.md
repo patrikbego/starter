@@ -12,7 +12,7 @@ npm ci
 npx expo start
 ```
 
-Configure the DEV backend URL and matching Firebase DEV project. A physical device cannot reach a backend at the computer's `localhost`; use an HTTPS DEV service or a deliberate local network/tunnel setup.
+Follow the [local run guide](./run/run-local.md) to configure the backend URL, create or select a Firebase DEV project, retrieve its API key, and enable email/password sign-in. A physical device cannot reach a backend at the computer's `localhost`; use an HTTPS DEV service or a deliberate local network/tunnel setup.
 
 ## Starter loop
 

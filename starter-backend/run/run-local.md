@@ -2,6 +2,12 @@
 
 The explicit `local` profile uses deterministic in-process adapters and does not require Google Cloud or an AI key.
 
+## Environment boundary
+
+The backend does not require a Firebase/GCP project in this mode. It uses mock token verification, an in-memory user repository, and mock AI. Do not create a Firebase project merely to run the backend locally.
+
+The current mobile client is different: it uses real Firebase client authentication even when connected to this local backend. Point that client at the dedicated **DEV Firebase project**, never the PROD project. The local backend accepts the resulting non-empty Bearer token but does not validate it with Firebase or use its real Firebase identity claims.
+
 ## Prerequisites
 
 - JDK 21 available to Maven
@@ -44,7 +50,7 @@ The local AI adapter returns a deterministic echo. A returned `sessionId` in the
 
 ## Optional emulators
 
-The current local implementation uses an in-memory user repository. Setting Firestore emulator variables alone does not switch that repository. Treat Firebase/Firestore emulator coverage as a separate adapter-integration mode to implement before template v1.
+No Firebase or Firestore emulator is started by this profile. The current local implementation uses an in-memory user repository and mock Firebase verifier. Setting emulator variables alone does not switch those adapters. Treat Firebase/Firestore emulator coverage as a separate adapter-integration mode to implement before template v1.
 
 ## Troubleshooting
 

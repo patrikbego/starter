@@ -10,6 +10,8 @@ Choose one workflow:
 
 This guide assumes `starter-mobile` is the repository root. The backend is an independently deployed service; obtain its URL and supported contract version from the backend release record.
 
+DEV and PROD use separate Firebase/GCP projects. The current Firebase Web app registrations live inside those projects; creating multiple app registrations in one project does not isolate environments.
+
 ## Fastest path
 
 ```bash
