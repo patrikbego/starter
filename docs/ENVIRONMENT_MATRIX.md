@@ -38,14 +38,21 @@ For strict “build once, promote” semantics, store images in a shared Artifac
 | `OPENAI_API_KEY` | secret value | Secret Manager |
 | `AI_MODEL` | provider model identifier | Environment/managed config |
 | `ACTUATOR_PASSWORD` | secret value | Secret Manager, only if Basic-auth actuator is retained |
+| `AI_REQUEST_TIMEOUT` | `30s` | Environment — provider call bound |
+| `AI_MAX_INPUT_CHARS` | `4000` | Environment — input cap before provider call |
+| `AI_MAX_REQUESTS_PER_USER` | `120` | Environment — per-user quota window limit |
+| `AI_RATE_LIMIT_WINDOW` | `1h` | Environment — quota window (`Duration` syntax) |
+
+AI guardrails fail startup when missing in `dev`/`prod` (same fail-closed rule as
+the other required variables). Quota exhaustion returns `429` with a
+`Retry-After` header. The per-instance nature of the default quota store and
+other limitations are tracked in `./REVIEW_FINDINGS.md` (caveat C1).
 
 Recommended operational variables:
 
 | Variable | Purpose |
 |---|---|
-| `AI_REQUEST_TIMEOUT` | Bound provider latency |
-| `AI_MAX_REQUESTS_PER_USER` | Per-user cost/abuse limit |
-| `AI_MAX_INPUT_CHARS` | Input cap enforced before provider call |
+| `AI_RATE_LIMIT_WINDOW` | Length of the per-user quota window (now required in cloud profiles) |
 | `LOG_FORMAT` | Human local logs versus structured cloud logs |
 
 ### `dev-local`

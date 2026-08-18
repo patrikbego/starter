@@ -18,7 +18,7 @@ Common subsets referenced below: **agility**, **dependability**, and **securabil
 | accuracy | Covered | Backend integration tests assert exact status codes and response bodies; AI reply quality is deliberately out of scope. |
 | adaptability | Covered | Templates are designed to be renamed/reshaped per product via `NEW_APP_WORKFLOW.md`. |
 | administrability | Covered | Per-environment run guides, GCP setup scripts, protected actuator endpoints, structured logs; no admin UI by design. |
-| affordability | Not yet | AI rate/quota/budget/timeout controls are roadmap Phase 3; GCP budgets are configured manually. |
+| affordability | Covered | AI timeout, per-user quota with `429`+`Retry-After`, and input caps enforced before provider calls (Phase 3); GCP budgets are configured manually. |
 | agility | Covered | Independent repos, CI on every push, DEV preview builds, short release loop. |
 | analyzability | Covered | Structured logs, request/response logging filter, correlation IDs, health endpoints. |
 | auditability | Covered | GitHub Actions history plus release records (commit, digest, approver — see `NEW_APP_WORKFLOW.md`). |
@@ -42,7 +42,7 @@ Common subsets referenced below: **agility**, **dependability**, and **securabil
 | distributability | Covered | Stateless backend scales horizontally on Cloud Run; mobile is distributed via app stores. |
 | durability | Covered | Firestore (managed) for user data; retention/export/restore/deletion policies not yet defined. |
 | effectiveness | Covered | The full starter loop (sign-in → `/api/me` → `/api/chat`) works end to end. |
-| efficiency | Not yet | No latency/load baselines; AI timeout, input caps, and quota are roadmap Phase 3. |
+| efficiency | Partially | AI provider calls are timeout-bound and pre-filtered (input cap, quota) so no wasted provider work; latency/load baselines are still an exercise for product teams. |
 | elasticity | Covered | Cloud Run scales on demand with per-environment `min`/`max` instances. |
 | evolvability | Covered | Layered architecture, versioned contract plan, documented extension paths. |
 | extensibility | Covered | Auth, Firestore, and AI sit behind ports; product entities/storage/search are documented extensions. |
@@ -93,20 +93,20 @@ Common subsets referenced below: **agility**, **dependability**, and **securabil
 | serviceability (a.k.a. supportability) | Covered | Structured logs, health endpoints, rollback-by-revision, run guides per environment. |
 | securability | Covered | Confidentiality + integrity + safety rows; hardened identity (App Check) is a P2 consideration. |
 | simplicity | Covered | Flat layering, no microservices/Kubernetes, explicit non-goals in the architecture overview. |
-| stability | Covered (foundation) | Pinned versions and lockfiles; dependency baseline upgrade is Phase 3. |
+| stability | Covered | Pinned versions and lockfiles; Spring Boot 4.1 / Spring AI 2.0 supported baseline (Phase 3) with Dependabot schedules ready. |
 | standards compliance | Covered | HTTP/JSON, JWTs, OpenAI-compatible surface, and a published OpenAPI 3 contract that CI keeps in sync with the implementation. |
 | survivability | Not yet | No multi-region/DR topology; disaster-recovery drills are Phase 6. |
 | sustainability | NA | Energy/organizational sustainability is outside the template contract. |
 | tailorability | Covered | Tailoring per product = customizability path (rename + env config in `NEW_APP_WORKFLOW.md`). |
-| testability | Covered | 14 backend tests, mobile `tsc`/ESLint gates; contract tests/fixtures are Phase 3/4. |
+| testability | Covered | 40 backend unit/integration tests incl. Firestore emulator round trip, rate-limit/input/timeout behavior, and the OpenAPI contract guard; mobile `tsc`/ESLint gates. |
 | timeliness | Not yet | No latency or freshness SLOs/budgets; acceptable at prototype scale, revisit before v1. |
 | traceability | Covered | Correlation IDs per request; release records pin commit/digest/approver; template provenance recorded. |
 | transparency | Covered | Open error mapping, honest docs, public review findings; unified error envelope is Phase 2. |
 | ubiquity | NA | Only iOS/Android/web-dev targets; ubiquitous reach is not a goal. |
 | understandability | Covered | Small codebase, layered docs, README as a single reading path. |
-| upgradability | Not yet | Milestone dependencies (Spring AI, Boot) upgraded in Phase 3; Dependabot config is ready. |
+| upgradability | Covered | Supported baseline (Spring Boot 4.1, Spring AI 2.0, spring-cloud-gcp 8.1, Firebase Admin 9.10); Dependabot config is ready. |
 | usability | Covered | Simple consistent interaction patterns; formal usability tests are beyond the template. |
-| vulnerability | Not yet | Scanning (dependency/container), SBOM, and secret scanning are Phase 2/3 + repo settings; 14 moderate advisories tracked in `REVIEW_FINDINGS.md`. |
+| vulnerability | Partially | CycloneDX SBOM + Trivy CRITICAL/HIGH container gate in CI/CD and secret scanning/push protection configured as repo settings; execution and dependency-scanning Dependabot coverage are caveats C3/C5 in the caveats register. |
 
 ## Keeping this table current
 

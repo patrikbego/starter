@@ -2,7 +2,7 @@
 
 This roadmap starts from the current prototype. Complete phases in order; later phases assume earlier boundaries are stable.
 
-Checkbox legend: `[x]` complete · `[~]` partially complete (note explains the remainder) · `[ ]` not started. Status updated 2026-08-17 after Phase 1.
+Checkbox legend: `[x]` complete · `[~]` partially complete (note explains the remainder) · `[ ]` not started. Status updated 2026-08-17 after Phase 3.
 
 ## Phase 0 — documentation baseline
 
@@ -40,12 +40,12 @@ Exit: cross-repository integration is explicit and missing production configurat
 
 ## Phase 3 — backend foundation hardening
 
-- [ ] Upgrade Spring Boot, Spring AI, Firebase Admin, and Google Cloud libraries to a supported baseline
-- [ ] Add AI timeout, rate limit, quota/budget, and safe telemetry
-- [ ] Make the AI endpoint explicitly stateless; defer conversation memory
-- [ ] Add integration tests for auth, errors, Firestore, and the OpenAPI contract
-- [ ] Add container scanning, SBOM/provenance, and digest capture
-- [ ] Add repeatable infrastructure code for DEV and PROD
+- [x] Upgrade Spring Boot, Spring AI, Firebase Admin, and Google Cloud libraries to a supported baseline — Spring Boot 4.1.0, Spring AI 2.0.0 (`spring-ai-starter-model-openai`), spring-cloud-gcp 8.1.0, Firebase Admin 9.10.0, libraries-bom 26.86.0; milestone repo removed; Boot 4 migration completed (Jackson 3 `tools.jackson`, `@MockitoBean`, `spring-boot-starter-webmvc-test`)
+- [x] Add AI timeout, rate limit, quota/budget, and safe telemetry — per-user sliding-window quota (`AI_MAX_REQUESTS_PER_USER`, `AI_RATE_LIMIT_WINDOW`) → `429 RATE_LIMITED` + `Retry-After`; input cap (`AI_MAX_INPUT_CHARS`) → `400 INPUT_LIMIT_EXCEEDED`; provider timeout (`AI_REQUEST_TIMEOUT`) → `502`; metrics `starter.ai.*` (outcome only, no prompts/PII); strict env placeholders in cloud profiles, guard-railed by `ConfigFailClosedTest`
+- [x] Make the AI endpoint explicitly stateless; defer conversation memory — `sessionId` removed from the v1 contract (no tags released yet), `AiChatPort.complete(message)` has no session concept; contract and mobile client updated
+- [x] Add integration tests for auth, errors, Firestore, and the OpenAPI contract — 40 tests green incl. rate-limit (429+Retry-After), input-cap, provider-timeout, auth-envelope, and a real Firestore emulator round trip (Testcontainers; opt-in `RUN_FIRESTORE_EMULATOR_TEST=true`, run in CI)
+- [x] Add container scanning, SBOM/provenance, and digest capture — CycloneDX SBOM at `target/bom.json` (artifact in CI, baked into the image), non-root container image with OCI labels, Trivy CRITICAL/HIGH gate in deploy-DEV (and on promoted images in PROD), immutable `image@sha256` digest captured and uploaded by deploy-DEV; PROD workflow accepts the digest for promotion (enforcement of digest-only is Phase 5)
+- [x] Add repeatable infrastructure code for DEV and PROD — `infra/` Terraform (APIs, Firestore native, Artifact Registry, Secret Manager, least-privilege runtime SA, GitHub WIF pool/provider, deployment roles), per-env tfvars, plan/apply/set-secrets scripts, `terraform validate` PR check
 
 Exit: a tagged backend candidate can be reproduced and safely deployed.
 
@@ -62,8 +62,8 @@ Exit: preview and production candidates build from clean CI.
 
 ## Phase 5 — delivery and recovery
 
-- [ ] Gate DEV deployment on the same backend CI job/workflow
-- [ ] Deploy backend by immutable digest and store release metadata
+- [~] Gate DEV deployment on the same backend CI job/workflow — deploy-DEV still runs independently (Phase 1 posture); digest/scan/SBOM capture is in place, job-level gating is Phases 5
+- [~/] Deploy backend by immutable digest and store release metadata — deploy-DEV captures and uploads the digest; deploy-PROD accepts a digest input for promotion, but rebuild remains possible until the legacy path is removed
 - [ ] Protect production with a GitHub environment and approval
 - [ ] Build store-signed mobile candidates and test through store tracks
 - [ ] Add post-deploy smoke tests and automated failure reporting

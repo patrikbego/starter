@@ -9,6 +9,20 @@ Coordination workspace for two **independent**, reusable template repositories, 
 
 The two repositories have independent histories, CI workflows, and (after first push) protection, secrets, and environments. They integrate only through a versioned HTTP contract; neither reaches into the other's source tree.
 
+## Technology stack (short)
+
+| Layer | Backend (`starter-backend`) | Mobile (`starter-mobile`) |
+|---|---|---|
+| Language / framework | Java 21, Spring Boot + Security | Expo / React Native / TypeScript |
+| Identity | Firebase Auth (Bearer ID tokens) | Firebase Auth client |
+| Data | Firestore behind a repository port | TanStack Query (server state) |
+| AI | Spring AI / OpenAI-compatible behind `AiChatPort` | Typed HTTP adapter |
+| API | Versioned OpenAPI v1 REST contract | Pinned contract copy, validated in CI |
+| Cloud / infra | GCP: Cloud Run, Firestore, Secret Manager, Artifact Registry; Terraform `infra/` | EAS Build/Submit; optional EAS Update |
+| Deployment target | Cloud Run (`{app}-api-{env}`), image in Artifact Registry, deployed via GitHub Actions OIDC/WIF | EAS → TestFlight / Play internal, then App Store / Play Store |
+
+Full per-repo lists: [`starter-backend/AGENTS.md`](./starter-backend/AGENTS.md) and [`starter-mobile/AGENTS.md`](./starter-mobile/AGENTS.md). Environments (`local` → `dev-local` → `dev` → `prod`) and where each runs per environment: [`docs/ENVIRONMENT_MATRIX.md`](./docs/ENVIRONMENT_MATRIX.md).
+
 ## What this parent repo is
 
 This repository is intentionally reduced to an index:
