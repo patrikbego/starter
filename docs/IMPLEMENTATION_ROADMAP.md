@@ -18,7 +18,7 @@ Exit: architecture and ownership are accepted before code is moved.
 
 - [x] Create independent backend and mobile Git repositories — done locally as nested repos (`starter-backend`, `starter-mobile`, own `.git` on `main`) with full history preserved via `git subtree split`
 - [x] Move each workflow to its owning repository root — backend: `ci.yml`, `deploy-dev.yml`, `deploy-prod.yml`; mobile: `ci.yml`, `eas-build-dev.yml`, `eas-submit-prod.yml`
-- [x] Remove monorepo path filters and `working-directory` assumptions — all `paths:` filters, `working-directory`, and the monorepo `cache-dependency-path` removed; mobile CI switched from `npx expo lint` (broken on this toolchain) to `npx eslint .`
+- [x] Remove monorepo path filters and `working-directory` assumptions — all `paths:` filters, `working-directory`, and the monorepo `cache-dependency-path` removed; mobile CI uses direct ESLint (`npm run lint`, Phase 4 made it fully deterministic with a pinned Node)
 - [x] Fix all docs so standalone clones have no sibling-path dependency — verified: children contain no `../starter-backend`/`../starter-mobile` links; cross-repo coordination docs stay with the parent index
 - [~] Add branch protection, CODEOWNERS, Dependabot/Renovate, and secret scanning — `/.github/CODEOWNERS` and `/.github/dependabot.yml` added to both repos plus repository-settings guidance in each README; branch protection, Dependabot alerts, and secret scanning/push protection are GitHub settings that activate only after each repo is pushed and configured
 - [x] Verify clean clones on supported developer platforms — fresh clones verified: backend `./mvnw test -B` passes (14 tests, 0 failures); mobile `npm ci` + `npx tsc --noEmit` + `npx eslint .` pass
@@ -51,12 +51,12 @@ Exit: a tagged backend candidate can be reproduced and safely deployed.
 
 ## Phase 4 — mobile foundation hardening
 
-- [ ] Reinstall dependencies from a clean lockfile state and make lint deterministic
-- [ ] Add unit/component tests for auth gating, API retry, and environment validation
-- [ ] Add generated or contract-checked API types
-- [ ] Add Firebase Auth persistence appropriate to React Native
-- [ ] Define app variants, bundle identifiers, schemes, and EAS environments
-- [ ] Configure runtime versions and update channels if EAS Update is retained
+- [x] Reinstall dependencies from a clean lockfile state and make lint deterministic (`npm ci` + `.nvmrc` Node 22 + direct ESLint in CI; 32 Jest tests green from clean install)
+- [x] Add unit/component tests for auth gating, API retry, and environment validation
+- [x] Add generated or contract-checked API types (`validate-contract.mjs` now checks `src/api/types.ts` surface vs the pinned OpenAPI)
+- [x] Add Firebase Auth persistence appropriate to React Native (AsyncStorage-backed via the SDK's RN entry)
+- [x] Define app variants, bundle identifiers, schemes, and EAS environments (per-profile identifiers/schemes + profile/`APP_ENV` pairing guard)
+- [x] Configure runtime versions (fingerprint) and record the EAS Update decision (not retained for v1; see caveat register)
 
 Exit: preview and production candidates build from clean CI.
 
