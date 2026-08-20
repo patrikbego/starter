@@ -8,3 +8,9 @@
 # Each is its own Git repository; the parent workspace no longer tracks them.
 starter-backend/
 starter-mobile/
+
+# Shared SonarQube local secrets (workspace-local; .env.example is tracked)
+shared-infra/sonar/.env
+
+# Agent scratch / rehearsal caches (regenerated, not source)
+.cache/

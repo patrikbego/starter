@@ -62,12 +62,12 @@ Exit: preview and production candidates build from clean CI.
 
 ## Phase 5 — delivery and recovery
 
-- [~] Gate DEV deployment on the same backend CI job/workflow — deploy-DEV still runs independently (Phase 1 posture); digest/scan/SBOM capture is in place, job-level gating is Phases 5
-- [~/] Deploy backend by immutable digest and store release metadata — deploy-DEV captures and uploads the digest; deploy-PROD accepts a digest input for promotion, but rebuild remains possible until the legacy path is removed
-- [ ] Protect production with a GitHub environment and approval
-- [ ] Build store-signed mobile candidates and test through store tracks
-- [ ] Add post-deploy smoke tests and automated failure reporting
-- [ ] Perform one backend rollback drill and one mobile release/OTA rollback drill
+- [x] Gate DEV deployment on the same backend CI job/workflow — extracted a shared reusable `verify.yml` (mvn verify + SBOM) used by both `ci.yml` and the gating `verify` job in `deploy-dev.yml`; job chain `verify → build-and-push → deploy-dev → smoke-dev` with a `deploy-dev` concurrency group (cancel-in-progress). actionlint-clean; execution confirmed once repos are pushed (roadmap status 2026-08-19)
+- [x] Deploy backend by immutable digest and store release metadata — deploy-DEV now deploys `image@sha256` (captured digest flows as a job output, never a mutable tag) and the post-smoke job writes/upload `release-metadata.json` (commit, digest, SBOM, Cloud Run revision, env, run URL, timestamp, smoke result, `promotable`). actionlint-clean; executes once pushed. Remaining: PROD legacy-rebuild removal + protected-env approval (Phase 5 A3)
+- [~] Protect production with a GitHub environment and approval — `deploy-prod.yml` replaced by `promote-prod.yml`: digest-only promotion under `environment: production`, no build step, `confirm_deploy` removed, WIF PROD principal, registry-verify + Trivy gate before deploy. actionlint-clean; remaining is the GitHub-side step (create the `production` environment + reviewers in repo settings, pending until the repo is pushed)
+- [~] Build store-signed mobile candidates and test through store tracks — workflows implemented (renamed to `build-preview` / new `build-release` / `submit-release`): `build-release` builds the store-signed `production` candidate per platform (tag/dispatch), records commit + EAS build IDs + contract/runtime version in `mobile-release-metadata.json`; `submit-release` (protected production env) uploads recorded IDs to TestFlight/Play internal, never preview. actionlint-clean. Remaining: EAS credentials + real store build and the device-track test (live setup)
+- [x] Add post-deploy smoke tests and automated failure reporting — DEV `smoke-dev` (health fail-closed + optional authenticated `/api/v1/me`), new PROD `smoke-prod`; failure fails the workflow and leaves the digest unpromotable; `notify` jobs (DEV+PROD) annotate and fire a Slack alert when `SLACK_WEBHOOK` is set; previous healthy Cloud Run revision retained as rollback target. actionlint-clean
+- [~] Perform one backend rollback drill and one mobile release/OTA rollback drill — runbooks codified (`starter-backend/docs/rollback_runbook.md`, `starter-mobile/docs/release_rollback_runbook.md`) with commands + drill checklists; execution is pending a live environment (none deployed yet)
 
 Exit: the team can promote and recover without rebuilding or guessing.
 
