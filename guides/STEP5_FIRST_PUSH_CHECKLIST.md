@@ -114,23 +114,32 @@ Backend and mobile promote independently; they meet only at the versioned API co
 - [ ] **Optional** DEV secrets for the authenticated smoke: `FIREBASE_WEB_API_KEY`,
       `FIREBASE_TEST_USER_EMAIL`, `FIREBASE_TEST_USER_PASSWORD` (GitHub).
 - [ ] **Optional** `SLACK_WEBHOOK` (GitHub secret) for the failure alert.
-- [ ] **Trigger `Deploy to DEV`** (push to main or workflow_dispatch), confirm the chain
+- [x] **Trigger `Deploy to DEV`** (push to main or workflow_dispatch), confirm the chain
       `verify → build-and-push → deploy-dev → smoke-dev` green and `release-metadata.json` uploaded
       (`backend-artifacts` / `release-metadata` artifacts). If smoke fails: check the notify job /
       rollback runbook (§4).
-  *⚠️ workflow template fixes landed on `main` while shaking this out (2026-08-22) — a fresh run
-  needs them a-priori:*
-  - `deploy-dev.yml`: `env.PROJECT_ID` was hard-coded `starter-dev` (wrong registry + deploy
-    SA); set to your real project (e.g. `starter-demo-dev`) and use `${{ env.PROJECT_ID }}` in
-    `--service-account`. `promote-prod.yml` example digest had the same stale project.
-  - IAM: the deploy impersonates the runtime SA; `artifactregistry.writer` must be on that **SA**
-    (not just the GitHub principalSet) or the push is denied. Added to `api_runtime` in `main.tf`.
-  - Trivy gate (`severity: CRITICAL,HIGH`, `ignore-unfixed: true`) fails on fixable CVEs in the
-    base image/deps; the scan's SARIF wasn't visible because `permissions:` lacked
-    `security-events: write` — added it + a `trivy-results.sarif` artifact upload (always) so
-    findings are inspectable when the gate trips.
-  - `set-secrets.sh`: also needed a bash-3.2 rewrite (`declare -A` unsupported on macOS
-    `/bin/bash`).
+  ✅ **First green run: 2026-08-22, run [32593078612](https://github.com/patrikbego/starter-backend/actions/runs/32593078612)**
+  — all five jobs success; revision `starter-api-dev-00003-n9l`, `smokeResult: OK`,
+  `promotable: true`; live check `/health/live` + `/health/ready` = 200, unauth
+  `/api/v1/me` = 401 (fail closed). Authenticated smoke skipped until Firebase test-user
+  secrets are set (optional, below). Fixes that were needed to get there (all on `main`):
+  - `deploy-dev.yml`: `env.PROJECT_ID` was hard-coded `starter-dev`; set to your real project
+    and use `${{ env.PROJECT_ID }}` in `--service-account`. Same stale project in
+    `promote-prod.yml` example digest.
+  - IAM (`main.tf`): runtime SA needed `roles/artifactregistry.writer` (image push), then
+    `roles/run.admin` + self `roles/iam.serviceAccountUser` (the deploy job impersonates it for
+    `gcloud run deploy` and passes it as `--service-account`). Re-run `plan.sh`/`apply.sh`.
+  - Trivy gate: Boot 4.1.0's BOM shipped vulnerable netty/httpcore5/httpclient5/jackson/log4j2;
+    upgraded parent to **Spring Boot 4.1.1** (+ legacy jackson-databind pinned 2.22.2,
+    Spring AI 2.0.1) so the CRITICAL+HIGH gate passes.
+  - SARIF upload: needs `security-events: write` + `actions: read`, but GitHub **Code Scanning is
+    not available on free-plan private repos** — step is `continue-on-error` now; findings are in
+    the `trivy-results` artifact either way.
+  - Runtime startup (two latent template bugs surfaced only on first real deploy):
+    Spring AI 2.x has no default `ChatClient` bean — adapter now injects `ChatClient.Builder`;
+    and `STARTER_CORS_ALLOWED_ORIGINS='*'` trips the fail-closed CORS check — DEV passes explicit
+    origins via a custom gcloud delimiter (`^@^…@`) because commas/colons break `--set-env-vars`.
+  - `set-secrets.sh`: bash-3.2 rewrite (`declare -A` unsupported on macOS `/bin/bash`).
 
 ## 3. Backend production
 
