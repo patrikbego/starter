@@ -252,6 +252,10 @@ Backend and mobile promote independently; they meet only at the versioned API co
 
 ## 4. Backend rollback drill
 
+> **Deferred (2026-08-22)** — skipped for now, to be run later. The mechanics it exercises are
+> already in place: Cloud Run retains the previous healthy revision as the rollback target, and
+> both rollbacks are one command (`gcloud run services update-traffic` / redeploy prior digest).
+
 - [ ] Follow [`starter-backend/docs/rollback_runbook.md`](../starter-backend/docs/rollback_runbook.md):
       deliberately break DEV, confirm smoke/notify fail (exercises A4), then PRIMARY (route traffic)
       and SECONDARY (redeploy good digest) rollback; record ≤5 min.
