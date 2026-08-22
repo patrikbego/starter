@@ -118,6 +118,19 @@ Backend and mobile promote independently; they meet only at the versioned API co
       `verify → build-and-push → deploy-dev → smoke-dev` green and `release-metadata.json` uploaded
       (`backend-artifacts` / `release-metadata` artifacts). If smoke fails: check the notify job /
       rollback runbook (§4).
+  *⚠️ workflow template fixes landed on `main` while shaking this out (2026-08-22) — a fresh run
+  needs them a-priori:*
+  - `deploy-dev.yml`: `env.PROJECT_ID` was hard-coded `starter-dev` (wrong registry + deploy
+    SA); set to your real project (e.g. `starter-demo-dev`) and use `${{ env.PROJECT_ID }}` in
+    `--service-account`. `promote-prod.yml` example digest had the same stale project.
+  - IAM: the deploy impersonates the runtime SA; `artifactregistry.writer` must be on that **SA**
+    (not just the GitHub principalSet) or the push is denied. Added to `api_runtime` in `main.tf`.
+  - Trivy gate (`severity: CRITICAL,HIGH`, `ignore-unfixed: true`) fails on fixable CVEs in the
+    base image/deps; the scan's SARIF wasn't visible because `permissions:` lacked
+    `security-events: write` — added it + a `trivy-results.sarif` artifact upload (always) so
+    findings are inspectable when the gate trips.
+  - `set-secrets.sh`: also needed a bash-3.2 rewrite (`declare -A` unsupported on macOS
+    `/bin/bash`).
 
 ## 3. Backend production
 
