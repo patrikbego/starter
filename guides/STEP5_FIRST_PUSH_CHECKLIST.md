@@ -170,6 +170,20 @@ Backend and mobile promote independently; they meet only at the versioned API co
 
 ## 3. Backend production
 
+- [ ] **Create your own PROD GCP project** — the template default `starter-prod` is **not usable**
+      as-is: project IDs are global, and that ID already exists under some other account, so every
+      Terraform call 403s (`iam.serviceAccounts.create`, WIF pool create, even
+      `projects.describe` — hit live 2026-08-22). Pick a unique ID and link billing (Cloud Run /
+      Artifact Registry need an active billing account, like DEV had):
+  ```bash
+  gcloud projects create starter-demo-prod --name="starter prod"
+  gcloud billing projects link starter-demo-prod \
+    --billing-account=$(gcloud billing accounts list --format='value(name)' | head -1)
+  ```
+  *Chose a different ID? Update it in `infra/prod.tfvars` (`project_id`) — `prod.tfvars` below
+  ships with `starter-demo-prod`. Verify ownership any time with `gcloud projects list`
+  (you must see the project there before `plan.sh` can work). State isolation vs DEV is safe:
+  the backend uses prefix `starter-${ENV}` per environment.*
 - [x] Reviewer/protection rules on the `production` environment (GitHub Settings → Environments):
       add reviewers, disallow self-approval. The env exists; this is the approval gate.
       **Skipped — free-plan private repos don't expose "Required reviewers"** (2026-08-22; same
@@ -178,14 +192,20 @@ Backend and mobile promote independently; they meet only at the versioned API co
       workflow_dispatch-only, promotion is digest-only. Revisit on Team/public plan.
 - [x] Set production environment's **Deployment branches and tags** to `main` only (2026-08-22,
       done via API on **both** repos; visible on free plan; stops stray-branch prod deploys).
-- [ ] `starter-prod` PROD secrets: `GCP_WORKLOAD_IDENTITY_PROVIDER_PROD`, `GCP_SERVICE_ACCOUNT_PROD`
-      (from `terraform apply.sh prod` output).
+- [ ] **PROD infra apply + secrets** (your PROD project from the first box):
+      `GCP_WORKLOAD_IDENTITY_PROVIDER_PROD`, `GCP_SERVICE_ACCOUNT_PROD` as GitHub secrets
+      (values come from the `terraform output` at the end of `apply.sh prod`).
   ```bash
   cd starter-backend/infra
-  TFSTATE_BUCKET=starter-tfstate ./scripts/plan.sh prod   # review
+  TFSTATE_BUCKET=starter-tfstate ./scripts/plan.sh prod   # review — should be ~27 to add
   ./scripts/apply.sh prod
+  gh secret set GCP_WORKLOAD_IDENTITY_PROVIDER_PROD -R patrikbego/starter-backend --body '<workload_identity_provider output>'
+  gh secret set GCP_SERVICE_ACCOUNT_PROD            -R patrikbego/starter-backend --body '<deployer_service_account output>'
   ./scripts/set-secrets.sh prod --openai-api-key 'sk-or-v1-…' --actuator-password 'change-me'
   ```
+  *⚠️ before re-running: `prod.tfvars` must have your real `github_organization` (fixed on
+  `main` 2026-08-22 — it was `REPLACE_ME_ORG`, which would have created a WIF provider trusting
+  a repo that can never match).*
 - [ ] Run **`Promote to PROD`** (workflow_dispatch) with the digest from the DEV `release-metadata`;
       confirm PROD smoke green. *On the free plan there is no approval prompt — dispatching the
       workflow from `main` is itself the deliberate act.*
