@@ -193,6 +193,9 @@ Backend and mobile promote independently; they meet only at the versioned API co
 - [ ] Set `ios.ascAppId` in `eas.json` `submit.production.ios` (currently `REPLACE_ME`); confirm
       branch protection + Dependabot + secret scanning (never commit `.p8`/provisioning files).
       (Same Settings paths as [§1](#1-push-backend).)
+- [ ] Reviewer/protection rules on the mobile **`production` environment** too
+      (Settings → Environments → production): add reviewers, disallow self-approval. Same as
+      [§3](#3-backend-production) — it gates `submit-release.yml`, i.e. the store submission.
 - [x] Mark mobile as a **template repository** — `<mobile repo> → Settings → General → ☑ "Template repository"`.
 
 - [ ] Build DEV preview (`build-preview` workflow); install on a device, confirm DEV identifiers.
