@@ -2,7 +2,7 @@
 
 Everything below is **live-setup work** (real GitHub/EAS/cloud accounts). All Step 5 *code and
 runbooks* are done and `actionlint`-clean. Work top-to-bottom; each phase's Done unlocks the next.
-Status is updated as we go (last update 2026-08-19, after first push).
+Status is updated as we go (last update 2026-08-20, after both gates green).
 
 Two independent repos: `starter-backend` (Spring Boot, Cloud Run) and `starter-mobile` (Expo/EAS).
 Backend and mobile promote independently; they meet only at the versioned API contract.
@@ -27,15 +27,16 @@ Backend and mobile promote independently; they meet only at the versioned API co
       `main` is pushed. Backend **CI (`verify`) ✅ green**, mobile **CI ✅ green** (2026-08-19).
 - [x] Backend commit history includes all Step 5 (gated deploy, digest+metadata, PROD promote,
       smoke/alerts); mobile incl. build-release/submit-release workflows.
-- [ ] On **your machine**, run both local gates green (shared Sonar at `http://localhost:9000`):
+- [x] On **your machine**, run both local gates green (shared Sonar at `http://localhost:9000`):
   ```bash
   # backend
   cd starter-backend && ./scripts/local-gate.sh starter-backend
   # mobile
   cd starter-mobile && ./scripts/local-gate.sh starter-mobile
   ```
-- [ ] Confirm Sonar dashboards: `/dashboard?id=starter-backend` (Java, coverage ~70%) and
-      `/dashboard?id=starter-mobile` (TS/JS).
+  (done 2026-08-20: backend `status: OK` — new_coverage 93.8, dups 0, violations 0; mobile `status: OK` — new_coverage 87.1, dups 0, violations 0.)
+- [x] Confirm Sonar dashboards: `/dashboard?id=starter-backend` (Java, coverage ~93%) and
+      `/dashboard?id=starter-mobile` (TS/JS, coverage ~87%).
 
 ## 1. Push backend
 
@@ -43,8 +44,20 @@ Backend and mobile promote independently; they meet only at the versioned API co
 - [x] `starter-mobile` pushed to `origin/main`; CI green.
 - [ ] **Branch protection** on `main` for both repos: require PR + required check `verify` (backend) /
       CI checks (mobile) + owners review. **Decision: stay on direct push for now** — add later.
+  *Later:* `<repo> -> Settings -> Branches (left, under "Code and automation") -> Add branch
+  protection rule -> "main" -> ☑ Require a pull request before merging (+ approvals, dismiss stale
+  approvals) -> ☑ Require status checks to pass -> select `verify` (backend) / `ci` (mobile)
+  -> ☑ Require review from Code Owners (needs `CODEOWNERS` in the repo) -> Create rule. Do both repos.*
 - [ ] Enable **Dependabot alerts/updates**, **secret scanning / push protection** (both repos).
+  *`<repo> → Settings -> Security analysis` (left, "Security") -> toggle on: Dependabot alerts,
+  Dependabot security updates, Secret scanning, push protection. Version updates: same page ->
+  Dependabot block -> "Create config" (writes `.github/dependabot.yml`). ⚠️ on a **free personal
+  account** these toggles are absent on **private** repos — they need GitHub Enterprise/GHAS; if you
+  don't see them, that's the reason (they then become "add later" like branch protection).*
 - [ ] **Mark both as template repositories** (Settings → Template repository) so apps are copied.
+  *`patrikbego/starter-backend` and `patrikbego/starter-mobile` -> Settings -> General ->
+  scroll to the bottom of General -> ☑ "Template repository". Then a green **"Use this template"**
+  button appears for anyone with access (public if you flip visibility, private = access-restricted).*
 
 ## 2. Backend cloud + secrets (run on YOUR machine — needs gcloud auth + terraform)
 
@@ -124,7 +137,9 @@ Backend and mobile promote independently; they meet only at the versioned API co
       `projectId`) and install iOS/Android credentials (`eas credentials`).
 - [ ] Set `ios.ascAppId` in `eas.json` `submit.production.ios` (currently `REPLACE_ME`); confirm
       branch protection + Dependabot + secret scanning (never commit `.p8`/provisioning files).
-- [ ] Mark mobile as a **template repository**.
+      (Same Settings paths as [§1](#1-push-backend).)
+- [ ] Mark mobile as a **template repository** — `<mobile repo> → Settings → General → ☑ "Template repository"`.
+
 - [ ] Build DEV preview (`build-preview` workflow); install on a device, confirm DEV identifiers.
 - [ ] Tag a release (`git tag v0.1.0 && git push --tags`) → `build-release` builds store-signed
       candidate, uploads `mobile-release-metadata.json`.
@@ -160,5 +175,7 @@ Backend and mobile promote independently; they meet only at the versioned API co
 | `ios.ascAppId` in `eas.json` | mobile | file (set to real value) |
 | `production` environment (+ reviewers) | both | GitHub Settings → Environments |
 
-Current position (2026-08-19): both repos pushed, CI green, `production` envs created, Trivy +
-emulator-test fixes applied, first Deploy-to-DEV pending the cloud block in [§2](#2-backend-cloud--secrets).
+Current position (2026-08-20): both repos pushed, CI green, local Sonar gates green (backend 93.8 /
+mobile 87.1 new coverage), `production` envs created, Trivy + emulator-test fixes applied. §1
+GitHub-setting guides added (branch protection deferred — direct push; Dependabot/secret-scanning
+toggles may be absent on free/private). Next: cloud block in [§2](#2-backend-cloud--secrets).
