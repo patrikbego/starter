@@ -2,7 +2,7 @@
 
 Everything below is **live-setup work** (real GitHub/EAS/cloud accounts). All Step 5 *code and
 runbooks* are done and `actionlint`-clean. Work top-to-bottom; each phase's Done unlocks the next.
-Status is updated as we go (last update 2026-08-20, after both gates green).
+Status is updated as we go (last update 2026-08-22, after DEV infra applied).
 
 Two independent repos: `starter-backend` (Spring Boot, Cloud Run) and `starter-mobile` (Expo/EAS).
 Backend and mobile promote independently; they meet only at the versioned API contract.
@@ -61,38 +61,46 @@ Backend and mobile promote independently; they meet only at the versioned API co
 
 ## 2. Backend cloud + secrets (run on YOUR machine — needs gcloud auth + terraform)
 
-> Not runnable from DSH (gcloud auth / terraform live with your GCP). Do this block locally.
+> gcloud auth happens on your machine; planning/applying are plain `terraform` CLI commands that
+> can also be driven from the agent sandbox once ADC is in place (that's how 2026-08-22's run went).
 
-- [ ] **Install Terraform** (-if missing):
+- [x] **Install Terraform** (2026-08-22, v1.11.2 — direct binary, not brew):
   ```bash
-  brew install terraform
+  # brew install terraform  # ✗ formula removed from homebrew/core (HashiCorp BSL move);
+  #                         #   'brew tap hashicorp/tap' also fails if git < 2.24 (Xcode CLT)
+  curl -LO https://releases.hashicorp.com/terraform/1.11.2/terraform_1.11.2_darwin_amd64.zip
+  unzip -o terraform_1.11.2_darwin_amd64.zip -d /usr/local/bin
+  terraform version   # require >= 1.6.0 (main.tf)
   ```
-- [ ] **Auth to GCP** (owner, first run — creates Application Default Credentials for the provider):
+- [x] **Auth to GCP** (owner, first run — creates Application Default Credentials for the provider):
   ```bash
   gcloud auth application-default login
-  gcloud config set project <your-project-id>   # if not already set
+  gcloud auth application-default set-quota-project starter-demo-dev   # fixes ADC quota warnings
+  gcloud config set project starter-demo-dev
   ```
-- [ ] **Create the Terraform state bucket** (one-time):
+- [x] **Create the Terraform state bucket** (one-time, 2026-08-22):
   ```bash
   gcloud storage buckets create gs://starter-tfstate --location=europe-west2
   # or a name you own; plan.sh expects TFSTATE_BUCKET
   ```
-- [ ] **Backend DEV plan + apply** (review the diff — it creates Cloud Run services, Firestore,
-      Artifact Registry, the DEV deployer SA, and the WIF pool):
+- [x] **Backend DEV plan + apply** (2026-08-22 — plan 24 to add; apply complete, 24 created):
   ```bash
   cd starter-backend/infra
   TFSTATE_BUCKET=starter-tfstate ./scripts/plan.sh dev
   # <- review; then:
   ./scripts/apply.sh dev     # prints `terraform output` at the end
   ```
-- [ ] From the apply output, **copy these two values** and give them to the agent (or paste below)
-      so the GitHub **DEV secrets** can be set:
+  *⚠️ template fixes needed before it ran (both committed on `main`):*
+  - `infra/main.tf` — two parenthesized multiline ternaries (`billing_account`, `monitoring_notification_channels`); HCL can't continue `? :` across a newline after a completed expression.
+  - `infra/dev.tfvars` — must hold your **real** project + org, e.g. `project_id = "starter-demo-dev"`, `github_organization = "patrikbego"`. The template's `REPLACE_ME_ORG` breaks WIF (exact-repo match); default `starter-dev` may not be owned by you.
+- [x] From the apply output, **copy these two values** and set them as GitHub **DEV secrets** (done 2026-08-22):
   - `workload_identity_provider` → `GCP_WORKLOAD_IDENTITY_PROVIDER_DEV`
+    = `projects/906316354955/locations/global/workloadIdentityPools/github-dev/providers/github-repo`
   - `deployer_service_account` → `GCP_SERVICE_ACCOUNT_DEV`
-  (The agent/myself sets these as repo secrets; or do it manually:
+    = `starter-api@starter-demo-dev.iam.gserviceaccount.com`
   ```bash
-  gh secret set GCP_WORKLOAD_IDENTITY_PROVIDER_DEV -R patrikbego/starter-backend --body "$(terraform output -raw workload_identity_provider)"
-  gh secret set GCP_SERVICE_ACCOUNT_DEV   -R patrikbego/starter-backend --body "$(terraform output -raw deployer_service_account)"
+  gh secret set GCP_WORKLOAD_IDENTITY_PROVIDER_DEV -R patrikbego/starter-backend --body 'projects/906316354955/locations/global/workloadIdentityPools/github-dev/providers/github-repo'
+  gh secret set GCP_SERVICE_ACCOUNT_DEV   -R patrikbego/starter-backend --body 'starter-api@starter-demo-dev.iam.gserviceaccount.com'
   ```
 - [ ] **Populate GCP *Secret Manager* runtime secrets** (NOT GitHub — workflows read them via
       `--set-secrets`): keep DEV/PROD values strictly separate.
@@ -100,6 +108,9 @@ Backend and mobile promote independently; they meet only at the versioned API co
   cd starter-backend/infra
   ./scripts/set-secrets.sh dev --openai-api-key 'sk-or-v1-…' --actuator-password 'change-me'
   ```
+  *⚠️ template fix needed (committed): `set-secrets.sh` originally hard-coded
+  `PROJECT_ID="starter-${ENV}"`; it now reads `project_id` from `<env>.tfvars`. Without the fix it
+  targets the wrong project when your project id isn't literally `starter-dev`*
 - [ ] **Optional** DEV secrets for the authenticated smoke: `FIREBASE_WEB_API_KEY`,
       `FIREBASE_TEST_USER_EMAIL`, `FIREBASE_TEST_USER_PASSWORD` (GitHub).
 - [ ] **Optional** `SLACK_WEBHOOK` (GitHub secret) for the failure alert.
@@ -175,8 +186,11 @@ Backend and mobile promote independently; they meet only at the versioned API co
 | `ios.ascAppId` in `eas.json` | mobile | file (set to real value) |
 | `production` environment (+ reviewers) | both | GitHub Settings → Environments |
 
-Current position (2026-08-20): both repos pushed, CI green, local Sonar gates green (backend 93.8 /
-mobile 87.1 new coverage), `production` envs created, **§1 completed except branch protection**
-(Dependabot alerts/updates + secret scanning + push protection on; both repos marked template).
-Branch protection explicitly deferred — requires a paid plan, staying on direct push. Next: cloud
-block in [§2](#2-backend-cloud--secrets).
+Current position (2026-08-22): both repos pushed, CI green, local Sonar gates green (backend 93.8 /
+mobile 87.1 new coverage), `production` envs created, §1 complete except branch protection (deferred
+— paid plan, staying on direct push). **§2 backend cloud block done except runtime secrets + first
+deploy**: Terraform installed, ADC authed, `gs://starter-tfstate` created, DEV applied (24
+resources in `starter-demo-dev`), GitHub secrets `GCP_WORKLOAD_IDENTITY_PROVIDER_DEV` /
+`GCP_SERVICE_ACCOUNT_DEV` set. Infra template fixes shipped (ternaries, tfvars real values,
+set-secrets project lookup). Next: `set-secrets.sh dev` with a real OpenAI key, then trigger
+`Deploy to DEV` (§2 tail).
