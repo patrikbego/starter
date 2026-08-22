@@ -167,6 +167,12 @@ Backend and mobile promote independently; they meet only at the versioned API co
 
 - [ ] Reviewer/protection rules on the `production` environment (GitHub Settings → Environments):
       add reviewers, disallow self-approval. The env exists; this is the approval gate.
+  *⚠️ plan limit (2026-08-22): "Required reviewers" is **not shown** on free-plan private repos
+  — same family as branch protection (paid). Interim controls: set the environment's
+  **Deployment branches and tags → main only**, and rely on prod workflows being
+  workflow_dispatch-only + digest-only promotion. Revisit on a Team/public plan.*
+- [x] Set production environment's **Deployment branches and tags** to `main` only (2026-08-22,
+      done via API on **both** repos; visible on free plan; stops stray-branch prod deploys).
 - [ ] `starter-prod` PROD secrets: `GCP_WORKLOAD_IDENTITY_PROVIDER_PROD`, `GCP_SERVICE_ACCOUNT_PROD`
       (from `terraform apply.sh prod` output).
   ```bash
@@ -196,6 +202,8 @@ Backend and mobile promote independently; they meet only at the versioned API co
 - [ ] Reviewer/protection rules on the mobile **`production` environment** too
       (Settings → Environments → production): add reviewers, disallow self-approval. Same as
       [§3](#3-backend-production) — it gates `submit-release.yml`, i.e. the store submission.
+      *⚠️ same plan limit as §3: "Required reviewers" hidden on free-plan private repos;
+      branch policy `main`-only is set. Add reviewers when on a Team/public plan.*
 - [x] Mark mobile as a **template repository** — `<mobile repo> → Settings → General → ☑ "Template repository"`.
 
 - [ ] Build DEV preview (`build-preview` workflow); install on a device, confirm DEV identifiers.
