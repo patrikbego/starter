@@ -170,7 +170,7 @@ Backend and mobile promote independently; they meet only at the versioned API co
 
 ## 3. Backend production
 
-- [ ] **Create your own PROD GCP project** — the template default `starter-prod` is **not usable**
+- [x] **Create your own PROD GCP project** — the template default `starter-prod` is **not usable**
       as-is: project IDs are global, and that ID already exists under some other account, so every
       Terraform call 403s (`iam.serviceAccounts.create`, WIF pool create, even
       `projects.describe` — hit live 2026-08-22). Pick a unique ID and link billing (Cloud Run /
@@ -180,6 +180,8 @@ Backend and mobile promote independently; they meet only at the versioned API co
   gcloud billing projects link starter-demo-prod \
     --billing-account=$(gcloud billing accounts list --format='value(name)' | head -1)
   ```
+  ✅ **Done 2026-08-22**: `starter-demo-prod` created, billing linked
+  (`billingAccounts/008945-747CA7-523650`).
   *Chose a different ID? Update it in `infra/prod.tfvars` (`project_id`) — `prod.tfvars` below
   ships with `starter-demo-prod`. Verify ownership any time with `gcloud projects list`
   (you must see the project there before `plan.sh` can work). State isolation vs DEV is safe:
@@ -192,9 +194,13 @@ Backend and mobile promote independently; they meet only at the versioned API co
       workflow_dispatch-only, promotion is digest-only. Revisit on Team/public plan.
 - [x] Set production environment's **Deployment branches and tags** to `main` only (2026-08-22,
       done via API on **both** repos; visible on free plan; stops stray-branch prod deploys).
-- [ ] **PROD infra apply + secrets** (your PROD project from the first box):
+- [x] **PROD infra apply + secrets** (your PROD project from the first box):
       `GCP_WORKLOAD_IDENTITY_PROVIDER_PROD`, `GCP_SERVICE_ACCOUNT_PROD` as GitHub secrets
       (values come from the `terraform output` at the end of `apply.sh prod`).
+      ✅ **Done 2026-08-22**: apply complete (27 resources; needed one re-run — on a brand-new
+      project the AR repo + WIF pool creates 403 on API-enable propagation, second pass adds
+      only the stragglers); both GH `_PROD` secrets set from `terraform output`; PROD
+      Secret Manager `openai-api-key` v1 + `actuator-password` v1 enabled.
   ```bash
   cd starter-backend/infra
   TFSTATE_BUCKET=starter-tfstate ./scripts/plan.sh prod   # review — should be ~27 to add
@@ -212,10 +218,10 @@ Backend and mobile promote independently; they meet only at the versioned API co
   ./scripts/set-secrets.sh prod --openai-api-key 'sk-or-v1-…' --actuator-password 'change-me'
   ```
   *⚠️ never run the `gh secret set` lines with literal `'<...output>'` placeholders — the
-  string itself becomes the secret value (bit us 2026-08-22; re-set both afterwards).
+  string itself becomes the secret value (bit us 2026-08-22; re-set both afterwards).*
   ⚠️ also before re-running: `prod.tfvars` must have your real `github_organization`
   (fixed on `main` 2026-08-22 — it was `REPLACE_ME_ORG`, which would have created a WIF
-  provider trusting a repo that can never match).*
+  provider trusting a repo that can never match) — and the real `project_id`.
 - [x] **Grant PROD read on the DEV registry** (cross-project; template gap hit live
       2026-08-22 — `Promote to PROD` verifies/pulls the image from DEV's Artifact Registry).
       **Two** grants are needed, not one: the deployer SA (describe/verify step) *and* the
@@ -230,10 +236,19 @@ Backend and mobile promote independently; they meet only at the versioned API co
   # <PROD_PROJECT_NUMBER>: gcloud projects describe starter-demo-prod --format='value(projectNumber)'
   #   here: service-599289271429@serverless-robot-prod.iam.gserviceaccount.com (both granted 2026-08-22)
   ```
-- [ ] Run **`Promote to PROD`** (workflow_dispatch) with the digest from the DEV `release-metadata`;
+- [x] Run **`Promote to PROD`** (workflow_dispatch) with the digest from the DEV `release-metadata`;
       confirm PROD smoke green. *On the free plan there is no approval prompt — dispatching the
       workflow from `main` is itself the deliberate act.*
-- [ ] Reserve PROD-only firebase/other values strictly apart from DEV.
+  ✅ **Done 2026-08-22, run [32598761852](https://github.com/patrikbego/starter-backend/actions/runs/32598761852)**:
+  digest `…starter-api@sha256:841bd5efe8323a28de26a6819de5b621d80f3dc9bb49e42eaa53d4b2a7f49de2`
+  promoted; revision **`starter-api-prod-00002-czt`** at
+  `https://starter-api-prod-pi7t6ivt6q-nw.a.run.app`; live `/health/live` + `/health/ready` 200,
+  unauth `/api/v1/me` 401 (fail closed). Two failures on the way (both documented above):
+  stale `PROJECT_ID` in `promote-prod.yml` (fixed `03039f1`), then the service-agent pull grant.
+- [x] Reserve PROD-only firebase/other values strictly apart from DEV.
+      PROD Secret Manager has its own `openai-api-key` / `actuator-password`; DEV and PROD never
+      share values. *Still pending: registering a Firebase web app in `starter-demo-prod` for
+      mobile PROD auth (needed by §5–§6 store builds, not by the backend smoke).*
 
 ## 4. Backend rollback drill
 
@@ -291,13 +306,14 @@ Backend and mobile promote independently; they meet only at the versioned API co
 | `ios.ascAppId` in `eas.json` | mobile | file (set to real value) |
 | `production` environment | both | GitHub Settings → Environments (reviewers = paid plan, skipped; `main`-only branch policy set) |
 
-Current position (2026-08-22, evening): **§2 complete — Deploy to DEV is green end-to-end**
-(run [32593078612](https://github.com/patrikbego/starter-backend/actions/runs/32593078612):
-verify → build → deploy → smoke → notify all success; revision `starter-api-dev-00003-n9l`,
-`smokeResult: OK`, `promotable: true`; live `/health/*` 200, unauth `/api/v1/me` 401).
-Sonar gates green (backend 93.8 / mobile 87.1 new coverage). Plan-gated items consciously
-skipped: branch protection, environment required-reviewers (both repos), Code Scanning SARIF
-upload — interim controls documented in-place. Still open (optional): real OpenRouter key
-verification in Secret Manager, Firebase test-user secrets for the authed smoke, SLACK_WEBHOOK.
-Next phase: §3 backend production (PROD tfvars/secrets + Promote to PROD with the DEV digest),
-then §4 rollback drill.
+Current position (2026-08-22, late): **§2 + §3 complete — DEV and PROD both green.**
+- DEV: run [32593078612](https://github.com/patrikbego/starter-backend/actions/runs/32593078612),
+  revision `starter-api-dev-00003-n9l`, promotable.
+- PROD: run [32598761852](https://github.com/patrikbego/starter-backend/actions/runs/32598761852)
+  promoted that exact digest → `starter-api-prod-00002-czt` at
+  `https://starter-api-prod-pi7t6ivt6q-nw.a.run.app` (health 200s, unauth `/me` 401).
+- Sonar gates green (backend 93.8 / mobile 87.1 new coverage). Plan-gated items consciously
+  skipped: branch protection, environment required-reviewers (both repos), Code Scanning SARIF.
+Still open: §4 rollback drill (DEV, then PROD window); optional Firebase test-user secrets +
+SLACK_WEBHOOK; verify the OpenRouter key actually works on `/api/v1/ai/chat`; PROD Firebase web
+app for mobile auth; then §5–§7 mobile.
