@@ -17,7 +17,8 @@ Backend and mobile promote independently; they meet only at the versioned API co
   bounded retry remain and run locally. **TODO:** re-enable once a runner-stable emulator fix lands.
 - **Trivy** action version was `@0.36.0` (no `v`) and GitHub couldn't resolve it — corrected to
   `@v0.36.0` in `deploy-dev.yml` and `promote-prod.yml`.
-- `production` GitHub environments created in **both** repos (reviewer rules still to add — see [3](#3-backend-production)).
+- `production` GitHub environments created in **both** repos (reviewer rules skipped — free-plan
+  private repos don't expose them; see [3](#3-backend-production)).
 
 ---
 
@@ -42,9 +43,9 @@ Backend and mobile promote independently; they meet only at the versioned API co
 
 - [x] `starter-backend` pushed to `origin/main` (2026-08-19); CI green.
 - [x] `starter-mobile` pushed to `origin/main`; CI green.
-- [ ] **Branch protection** on `main` for both repos: require PR + required check `verify` (backend) /
-      CI checks (mobile) + owners review. **Decision: stay on direct push — deferred** (branch
-      protection requires a paid plan; not enabling now, 2026-08-20).
+- [x] **Branch protection** on `main` for both repos: require PR + required check `verify` (backend) /
+      CI checks (mobile) + owners review. **Skipped — requires a paid plan** (free personal plan;
+      staying on direct push, decided 2026-08-20). Revisit on Team/public visibility.
   *Later:* `<repo> -> Settings -> Branches (left, under "Code and automation") -> Add branch
   protection rule -> "main" -> ☑ Require a pull request before merging (+ approvals, dismiss stale
   approvals) -> ☑ Require status checks to pass -> select `verify` (backend) / `ci` (mobile)
@@ -165,12 +166,12 @@ Backend and mobile promote independently; they meet only at the versioned API co
 
 ## 3. Backend production
 
-- [ ] Reviewer/protection rules on the `production` environment (GitHub Settings → Environments):
+- [x] Reviewer/protection rules on the `production` environment (GitHub Settings → Environments):
       add reviewers, disallow self-approval. The env exists; this is the approval gate.
-  *⚠️ plan limit (2026-08-22): "Required reviewers" is **not shown** on free-plan private repos
-  — same family as branch protection (paid). Interim controls: set the environment's
-  **Deployment branches and tags → main only**, and rely on prod workflows being
-  workflow_dispatch-only + digest-only promotion. Revisit on a Team/public plan.*
+      **Skipped — free-plan private repos don't expose "Required reviewers"** (2026-08-22; same
+      family as branch protection). Interim controls instead: environment's
+      **Deployment branches and tags → main only** (next box), prod workflows are
+      workflow_dispatch-only, promotion is digest-only. Revisit on Team/public plan.
 - [x] Set production environment's **Deployment branches and tags** to `main` only (2026-08-22,
       done via API on **both** repos; visible on free plan; stops stray-branch prod deploys).
 - [ ] `starter-prod` PROD secrets: `GCP_WORKLOAD_IDENTITY_PROVIDER_PROD`, `GCP_SERVICE_ACCOUNT_PROD`
@@ -182,7 +183,8 @@ Backend and mobile promote independently; they meet only at the versioned API co
   ./scripts/set-secrets.sh prod --openai-api-key 'sk-or-v1-…' --actuator-password 'change-me'
   ```
 - [ ] Run **`Promote to PROD`** (workflow_dispatch) with the digest from the DEV `release-metadata`;
-      approve (env reviewers) and confirm PROD smoke green.
+      confirm PROD smoke green. *On the free plan there is no approval prompt — dispatching the
+      workflow from `main` is itself the deliberate act.*
 - [ ] Reserve PROD-only firebase/other values strictly apart from DEV.
 
 ## 4. Backend rollback drill
@@ -199,11 +201,11 @@ Backend and mobile promote independently; they meet only at the versioned API co
 - [ ] Set `ios.ascAppId` in `eas.json` `submit.production.ios` (currently `REPLACE_ME`); confirm
       branch protection + Dependabot + secret scanning (never commit `.p8`/provisioning files).
       (Same Settings paths as [§1](#1-push-backend).)
-- [ ] Reviewer/protection rules on the mobile **`production` environment** too
+- [x] Reviewer/protection rules on the mobile **`production` environment** too
       (Settings → Environments → production): add reviewers, disallow self-approval. Same as
       [§3](#3-backend-production) — it gates `submit-release.yml`, i.e. the store submission.
-      *⚠️ same plan limit as §3: "Required reviewers" hidden on free-plan private repos;
-      branch policy `main`-only is set. Add reviewers when on a Team/public plan.*
+      **Skipped — free-plan private repos don't expose "Required reviewers"** (2026-08-22);
+      branch policy `main`-only is set. Add reviewers when on a Team/public plan.
 - [x] Mark mobile as a **template repository** — `<mobile repo> → Settings → General → ☑ "Template repository"`.
 
 - [ ] Build DEV preview (`build-preview` workflow); install on a device, confirm DEV identifiers.
@@ -239,13 +241,15 @@ Backend and mobile promote independently; they meet only at the versioned API co
 | `EXPO_TOKEN` | mobile | GitHub secret |
 | iOS/Android EAS credentials | mobile | EAS (not GitHub) |
 | `ios.ascAppId` in `eas.json` | mobile | file (set to real value) |
-| `production` environment (+ reviewers) | both | GitHub Settings → Environments |
+| `production` environment | both | GitHub Settings → Environments (reviewers = paid plan, skipped; `main`-only branch policy set) |
 
-Current position (2026-08-22): both repos pushed, CI green, local Sonar gates green (backend 93.8 /
-mobile 87.1 new coverage), `production` envs created, §1 complete except branch protection (deferred
-— paid plan, staying on direct push). **§2 backend cloud block done except runtime secrets + first
-deploy**: Terraform installed, ADC authed, `gs://starter-tfstate` created, DEV applied (24
-resources in `starter-demo-dev`), GitHub secrets `GCP_WORKLOAD_IDENTITY_PROVIDER_DEV` /
-`GCP_SERVICE_ACCOUNT_DEV` set. Infra template fixes shipped (ternaries, tfvars real values,
-set-secrets project lookup). Next: `set-secrets.sh dev` with a real OpenAI key, then trigger
-`Deploy to DEV` (§2 tail).
+Current position (2026-08-22, evening): **§2 complete — Deploy to DEV is green end-to-end**
+(run [32593078612](https://github.com/patrikbego/starter-backend/actions/runs/32593078612):
+verify → build → deploy → smoke → notify all success; revision `starter-api-dev-00003-n9l`,
+`smokeResult: OK`, `promotable: true`; live `/health/*` 200, unauth `/api/v1/me` 401).
+Sonar gates green (backend 93.8 / mobile 87.1 new coverage). Plan-gated items consciously
+skipped: branch protection, environment required-reviewers (both repos), Code Scanning SARIF
+upload — interim controls documented in-place. Still open (optional): real OpenRouter key
+verification in Secret Manager, Firebase test-user secrets for the authed smoke, SLACK_WEBHOOK.
+Next phase: §3 backend production (PROD tfvars/secrets + Promote to PROD with the DEV digest),
+then §4 rollback drill.
