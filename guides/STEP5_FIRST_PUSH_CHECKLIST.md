@@ -199,13 +199,23 @@ Backend and mobile promote independently; they meet only at the versioned API co
   cd starter-backend/infra
   TFSTATE_BUCKET=starter-tfstate ./scripts/plan.sh prod   # review — should be ~27 to add
   ./scripts/apply.sh prod
-  gh secret set GCP_WORKLOAD_IDENTITY_PROVIDER_PROD -R patrikbego/starter-backend --body '<workload_identity_provider output>'
-  gh secret set GCP_SERVICE_ACCOUNT_PROD            -R patrikbego/starter-backend --body '<deployer_service_account output>'
+  ```
+  *Hit 2026-08-22: on a brand-new project, AR repo + WIF pool creates can 403 (API-enable
+  propagation race) while everything else succeeds — just re-run `plan.sh` + `apply.sh`;
+  the second pass adds only the stragglers.*
+  ```bash
+  # paste-safe: reads values straight from tfstate, never hand-copy
+  gh secret set GCP_WORKLOAD_IDENTITY_PROVIDER_PROD -R patrikbego/starter-backend \
+    --body "$(terraform output -raw workload_identity_provider)"
+  gh secret set GCP_SERVICE_ACCOUNT_PROD            -R patrikbego/starter-backend \
+    --body "$(terraform output -raw deployer_service_account)"
   ./scripts/set-secrets.sh prod --openai-api-key 'sk-or-v1-…' --actuator-password 'change-me'
   ```
-  *⚠️ before re-running: `prod.tfvars` must have your real `github_organization` (fixed on
-  `main` 2026-08-22 — it was `REPLACE_ME_ORG`, which would have created a WIF provider trusting
-  a repo that can never match).*
+  *⚠️ never run the `gh secret set` lines with literal `'<...output>'` placeholders — the
+  string itself becomes the secret value (bit us 2026-08-22; re-set both afterwards).
+  ⚠️ also before re-running: `prod.tfvars` must have your real `github_organization`
+  (fixed on `main` 2026-08-22 — it was `REPLACE_ME_ORG`, which would have created a WIF
+  provider trusting a repo that can never match).*
 - [ ] Run **`Promote to PROD`** (workflow_dispatch) with the digest from the DEV `release-metadata`;
       confirm PROD smoke green. *On the free plan there is no approval prompt — dispatching the
       workflow from `main` is itself the deliberate act.*
