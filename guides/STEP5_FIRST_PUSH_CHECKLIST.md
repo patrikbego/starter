@@ -216,15 +216,20 @@ Backend and mobile promote independently; they meet only at the versioned API co
   ⚠️ also before re-running: `prod.tfvars` must have your real `github_organization`
   (fixed on `main` 2026-08-22 — it was `REPLACE_ME_ORG`, which would have created a WIF
   provider trusting a repo that can never match).*
-- [x] **Grant PROD's SA read on the DEV registry** (cross-project; template gap hit live
-      2026-08-22 — `Promote to PROD` verifies/pulls the image from DEV's Artifact Registry):
+- [x] **Grant PROD read on the DEV registry** (cross-project; template gap hit live
+      2026-08-22 — `Promote to PROD` verifies/pulls the image from DEV's Artifact Registry).
+      **Two** grants are needed, not one: the deployer SA (describe/verify step) *and* the
+      Cloud Run service agent (the actual image pull at revision creation):
   ```bash
   gcloud projects add-iam-policy-binding starter-demo-dev \
     --member=serviceAccount:starter-api@starter-demo-prod.iam.gserviceaccount.com \
     --role=roles/artifactregistry.reader
+  gcloud projects add-iam-policy-binding starter-demo-dev \
+    --member=serviceAccount:service-<PROD_PROJECT_NUMBER>@serverless-robot-prod.iam.gserviceaccount.com \
+    --role=roles/artifactregistry.reader
+  # <PROD_PROJECT_NUMBER>: gcloud projects describe starter-demo-prod --format='value(projectNumber)'
+  #   here: service-599289271429@serverless-robot-prod.iam.gserviceaccount.com (both granted 2026-08-22)
   ```
-  *If the PROD Cloud Run revision later fails to pull the image, also grant the same role to
-  the Cloud Run service agent `service-<PROD_PROJECT_NUMBER>@serverless-robot-prod.iam.gserviceaccount.com`.*
 - [ ] Run **`Promote to PROD`** (workflow_dispatch) with the digest from the DEV `release-metadata`;
       confirm PROD smoke green. *On the free plan there is no approval prompt — dispatching the
       workflow from `main` is itself the deliberate act.*
