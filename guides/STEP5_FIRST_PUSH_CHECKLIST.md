@@ -113,7 +113,29 @@ Backend and mobile promote independently; they meet only at the versioned API co
   targets the wrong project when your project id isn't literally `starter-dev`*
 - [ ] **Optional** DEV secrets for the authenticated smoke: `FIREBASE_WEB_API_KEY`,
       `FIREBASE_TEST_USER_EMAIL`, `FIREBASE_TEST_USER_PASSWORD` (GitHub).
+  <details><summary><strong>Where to get each</strong> (click-path)</summary>
+
+  All three are GitHub repo secrets — *Settings → Secrets and variables → Actions → New
+  repository secret*. The smoke signs in via the Identity Toolkit REST API
+  (`accounts:signInWithPassword?key=<WEB_API_KEY>`), so it needs a **real Firebase user**, not a
+  service account.
+
+  1. `FIREBASE_WEB_API_KEY` — [console.firebase.google.com](https://console.firebase.google.com)
+     → select the DEV project (`starter-demo-dev`) → ⚙️ **Project settings → General → Your apps**.
+     No web app yet? Click the Web `</>` icon, register one (hosting off), then copy
+     `firebaseConfig.apiKey` (the long `AIzaSy…` string). Same key class the mobile app ships.
+  2. Email/password provider must be on first: **Build → Authentication → Sign-in method →
+     Email/Password → Enable**.
+  3. `FIREBASE_TEST_USER_EMAIL` / `FIREBASE_TEST_USER_PASSWORD` — **Authentication → Users →
+     Add user**, e.g. `smoke-test@starter-demo-dev.com` + a strong password. DEV-project-only;
+     this account exists purely so CI can prove an authorized `/api/v1/me` returns 200.
+  </details>
 - [ ] **Optional** `SLACK_WEBHOOK` (GitHub secret) for the failure alert.
+  *Get it at [api.slack.com/apps](https://api.slack.com/apps) → **Create New App → From scratch**
+  → pick your workspace → **Incoming Webhooks** → toggle Activate → **Add New Webhook to
+  Workspace** → choose a channel → copy the `https://hooks.slack.com/services/T…/B…/…` URL into
+  the GitHub secret. Without it, deploy failures only show in the Actions run (Notify job still
+  succeeds silently).*
 - [x] **Trigger `Deploy to DEV`** (push to main or workflow_dispatch), confirm the chain
       `verify → build-and-push → deploy-dev → smoke-dev` green and `release-metadata.json` uploaded
       (`backend-artifacts` / `release-metadata` artifacts). If smoke fails: check the notify job /
