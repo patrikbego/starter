@@ -103,8 +103,12 @@ Backend and mobile promote independently; they meet only at the versioned API co
   gh secret set GCP_WORKLOAD_IDENTITY_PROVIDER_DEV -R patrikbego/starter-backend --body 'projects/906316354955/locations/global/workloadIdentityPools/github-dev/providers/github-repo'
   gh secret set GCP_SERVICE_ACCOUNT_DEV   -R patrikbego/starter-backend --body 'starter-api@starter-demo-dev.iam.gserviceaccount.com'
   ```
-- [ ] **Populate GCP *Secret Manager* runtime secrets** (NOT GitHub — workflows read them via
+- [x] **Populate GCP *Secret Manager* runtime secrets** (NOT GitHub — workflows read them via
       `--set-secrets`): keep DEV/PROD values strictly separate.
+      (Done 2026-08-22: `openai-api-key` v1 + `actuator-password` v1, both `enabled` in
+      `starter-demo-dev`; the green deploy mounted them successfully.
+      ⚠️ Re-verify the OpenRouter key value — it may have been captured truncated
+      (`sk-or-v1-cae7…`); test `/api/v1/ai/chat` and re-run `set-secrets.sh dev` if 401.)
   ```bash
   cd starter-backend/infra
   ./scripts/set-secrets.sh dev --openai-api-key 'sk-or-v1-…' --actuator-password 'change-me'
