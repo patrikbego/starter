@@ -546,11 +546,25 @@ Backend and mobile promote independently; they meet only at the versioned API co
   workflow's job env** — EAS-dashboard variables only ever reach the worker.
   </details>
 - [ ] Tag a release (`git tag v0.1.0 && git push --tags`) → `build-release` builds store-signed
-      candidate, uploads `mobile-release-metadata.json`.
+      candidate, uploads `mobile-release-metadata.json`. *(deferred 2026-08-23 — see below)*
 - [ ] Run `Submit release` with the recorded iOS/Android build IDs (needs the mobile `production`
-      env — created in §0a) → TestFlight + Play internal.
+      env — created in §0a) → TestFlight + Play internal. *(deferred 2026-08-23 — see below)*
+
+> **Deferred (2026-08-23)** — the §5 store path (tag → `build-release` → `submit-release`), §6's
+> release drill and §7 are **production work, consciously parked** with the preview milestone
+> green (run [32642572465](https://github.com/patrikbego/starter-mobile/actions/runs/32642572465)).
+> None of it is needed to call the CI / internal-distribution path done. Gates: App Store Connect
+> app registration ($99/yr program — already a member, distribution certs exist) + Play Console
+> ($25) + PROD Firebase config. **Resume order when picked back up:**
+> ① register the PROD Firebase web app (§3 recipe) → ② point repo variables / EAS `production`
+> env at the PROD values → ③ set `ios.ascAppId` in `eas.json` + create the Play app + internal
+> track → ④ tag `v0.1.0` → ⑤ submit + run §6's drills.
+> Not deferred: installing the green preview build on a device and confirming identifiers —
+> free, no store accounts, and the only unproven link in the CI path.
 
 ## 6. Mobile device + release drill
+
+> **Deferred (2026-08-23)** — needs store releases to exist; resume with §5's store path above.
 
 - [ ] Test the store case on real devices: **login → `me` → AI → refresh → sign-out**.
 - [ ] Follow [`starter-mobile/docs/release_rollback_runbook.md`](../starter-mobile/docs/release_rollback_runbook.md): start then halt a phased rollout; confirm installed builds keep working
@@ -582,7 +596,8 @@ Backend and mobile promote independently; they meet only at the versioned API co
 | `ios.ascAppId` in `eas.json` | mobile | file (set to real value) |
 | `production` environment | both | GitHub Settings → Environments (reviewers = paid plan, skipped; `main`-only branch policy set) |
 
-Current position (2026-08-23): **§2 + §3 complete; §5 mid-flight on the first preview build.**
+Current position (2026-08-23): **§2 + §3 complete; §5 CI/internal path GREEN (preview builds);
+store path deferred (resume order in §5).**
 - DEV: run [32593078612](https://github.com/patrikbego/starter-backend/actions/runs/32593078612),
   revision `starter-api-dev-00003-n9l`, promotable.
 - PROD: run [32598761852](https://github.com/patrikbego/starter-backend/actions/runs/32598761852)
@@ -596,6 +611,9 @@ Current position (2026-08-23): **§2 + §3 complete; §5 mid-flight on the first
   device-install check; next box is tag `v0.1.0` → `build-release`.
 - Sonar gates green (backend 93.8 / mobile 87.1 new coverage). Plan-gated items consciously
   skipped: branch protection, environment required-reviewers (both repos), Code Scanning SARIF.
-Still open: §4 rollback drill (DEV, then PROD window); optional Firebase test-user secrets +
-SLACK_WEBHOOK; verify the OpenRouter key actually works on `/api/v1/ai/chat`; PROD Firebase web
-app for mobile auth; then §5–§7 mobile.
+Still open (near-term): preview-build device install + identifier check; §4 rollback drill
+(DEV, then PROD window); optional Firebase test-user secrets + SLACK_WEBHOOK; verify the
+OpenRouter key actually works on `/api/v1/ai/chat`; Dependabot's 20 flagged vulnerabilities
+(14 high) on the mobile repo.
+Deferred to store time (2026-08-23): §5 tag → build-release → submit-release, §6 drills, §7 —
+resume order recorded at the end of §5; PROD Firebase web app is step ① of that order.
