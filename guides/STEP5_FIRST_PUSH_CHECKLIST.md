@@ -362,6 +362,12 @@ Backend and mobile promote independently; they meet only at the versioned API co
      (Repo-level is fine even for `submit-release`; it runs under the `production` environment,
      but repo secrets stay available there — no env-scoped copy needed.)
 
+  *⚠️ local npm friction (hit 2026-08-23):* if `npm i -g` / `npx` die with
+  `Your cache folder contains root-owned files … EPERM /Users/pb/.npm`, fix once with
+  ```bash
+  sudo chown -R 501:20 "/Users/pb/.npm"
+  ```
+
   **Create the EAS project** — name it **`starter-mobile`**, matching the app `slug`. The slug is
   immutable once set and is locked to the project id, so pick it once. Tie it to the repo via CLI:
   ```bash
@@ -597,6 +603,27 @@ Backend and mobile promote independently; they meet only at the versioned API co
 | iOS/Android EAS credentials | mobile | EAS (not GitHub); created via one-time interactive local builds |
 | `ios.ascAppId` in `eas.json` | mobile | file (set to real value) |
 | `production` environment | both | GitHub Settings → Environments (reviewers = paid plan, skipped; `main`-only branch policy set) |
+
+<details><summary><strong>Why the secrets above are safe (decided 2026-08-23)</strong> (click-path)</summary>
+
+Question that came up: *"repositories are public … can anyone see secrets / run actions?"*
+Current state: **both repos are private**, so exposure is moot today. If they ever go public:
+
+```
+1. GitHub always masks secret VALUES in run logs; forks never receive secrets;
+   secrets are not readable via API by anyone (write-only), including admins.
+2. GCP_WORKLOAD_IDENTITY_PROVIDER_* / GCP_SERVICE_ACCOUNT_* are identifiers,
+   not credentials — useless without the matching WIF pool, whose trust policy
+   pins attribute.repository == "<org>/<repo>" exactly.
+3. EXPO_TOKEN is the one true credential in Actions: anyone who can MODIFY a
+   workflow could print it. On public repos, first PRs run without approval by
+   default → keep the repos private until branch protection / required reviews
+   exist (Team plan), or gate fork PRs to "require approval for all outside
+   collaborators" (Settings → Actions → Fork pull request workflows).
+4. EAS project id, Firebase WEB api key and Cloud Run URLs are public-by-design
+   client config — shipping inside every app binary anyway.
+```
+</details>
 
 Current position (2026-08-23): **§2 + §3 complete; §5 CI/internal path GREEN (preview builds);
 store path deferred (resume order in §5).**
