@@ -2,7 +2,8 @@
 
 Everything below is **live-setup work** (real GitHub/EAS/cloud accounts). All Step 5 *code and
 runbooks* are done and `actionlint`-clean. Work top-to-bottom; each phase's Done unlocks the next.
-Status is updated as we go (last update 2026-08-23, after EAS project linked + CI pins).
+Status is updated as we go (last update 2026-08-23, after preview-build debugging: env wiring,
+credentials, plain-JS config).
 
 Two independent repos: `starter-backend` (Spring Boot, Cloud Run) and `starter-mobile` (Expo/EAS).
 Backend and mobile promote independently; they meet only at the versioned API contract.
@@ -342,7 +343,11 @@ Backend and mobile promote independently; they meet only at the versioned API co
       - **dynamic config**: `eas init` can't write `extra.eas.projectId` into a function-based
         `app.config.ts` automatically → set it as the fallback in
         `app.config.ts` (`process.env.EAS_PROJECT_ID ?? '<id>'`) and added `owner: 'p4trik'`.
-      `ios.ascAppId` + store credentials still pending — see the next box.
+      Credentials status (2026-08-23): **Android keystore** created (Build Credentials
+      `pItIhjhWCj`, remote on Expo server); **iOS** distribution cert + ad-hoc profiles exist for
+      both `com.starter.mobile.dev` and `com.starter.mobile.preview` with 3 registered devices —
+      created via the interactive builds in the next box. Store signing (`ascAppId`, Play) still
+      pending — see the next box.
   <details><summary><strong>EXPO_TOKEN / EAS project / credentials</strong> (click-path)</summary>
 
   Two owned accounts gate this box: the **Expo account** (free) and, later, paid **store**
@@ -360,10 +365,13 @@ Backend and mobile promote independently; they meet only at the versioned API co
   **Create the EAS project** — name it **`starter-mobile`**, matching the app `slug`. The slug is
   immutable once set and is locked to the project id, so pick it once. Tie it to the repo via CLI:
   ```bash
-  npm i -g eas-cli
+  npm i -g eas-cli@16
   cd starter-mobile
   eas init
   ```
+  *⚠️ pin to 16.x locally too:* a bare `npm i -g eas-cli` now installs 22.x, which breaks against
+  Expo SDK 54 (`eas init` dies calling `expo config --type private`; SDK 54 only accepts
+  `public|prebuild|introspect`). Same pin as the workflows (`>=16 <17`).
   First prompt → keep **New project** → name `starter-mobile` → pick your account/organization.
   *⚠️ wrinkle:* `app.config.ts` here is a *dynamic* config, so `eas init` prints
   `Cannot automatically write to dynamic config at: app.config.ts` and tells you to set
@@ -402,22 +410,74 @@ Backend and mobile promote independently; they meet only at the versioned API co
 - [ ] Build DEV preview (`build-preview` workflow); install on a device, confirm DEV identifiers.
   <details><summary><strong>Steps + settings paths</strong> (click-path)</summary>
 
-  1. **Commit and push the mobile changes** (the eas-cli 16 pin + the EAS-project linkage already
-     in `a9345f7`). This push **triggers the first preview build** (that's the workflow's only gate —
-     it also fires on any later push to `main`).
-  2. **Set the Firebase env vars on the EAS project** so CI can evaluate `app.config.ts` (it fails
-     closed without `EXPO_PUBLIC_FIREBASE_API_KEY`, `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN`,
-     `EXPO_PUBLIC_FIREBASE_PROJECT_ID`). Path:
-     [expo.dev](https://expo.dev) → **Dashboard → your EAS project → Environment variables** →
-     set the **`preview`** environment (that's the one `build-preview`'s `preview` profile reads; do
-     **not** use `production` — that's only for the store-submit step), matching your
-     [`.env`](starter-mobile/.env) DEV values.
-  3. **Watch the run** go `eas build` → success → the workflow records the EAS build IDs.
-  4. **Install on a device** — Expo emails / shows a QR install link for internal-distribution
-     builds — then confirm the DEV identifiers (e.g. `com.starter.mobile.dev`, `startermobile-dev`
-     scheme).
-  5. **Manual re-run** (if not pushed): [github.com/patrikbego/starter-mobile](https://github.com/patrikbego/starter-mobile)
-     → **Actions → EAS Build DEV → Run workflow** → branch `main` → **Run**.
+  The preview build needs **four** things wired before it goes green. Each was a real failure on
+  2026-08-23 — don't skip any:
+
+  **1. Secrets + variables (both stores!):**
+  - GitHub repo secret `EXPO_TOKEN` (authenticates `eas build` in CI) — *Settings → Secrets and
+    variables → Actions*.
+  - GitHub repo **variables** (public client config; the runner's own `expo config` read needs them
+    as process env): `EXPO_PUBLIC_FIREBASE_API_KEY`, `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN`,
+    `EXPO_PUBLIC_FIREBASE_PROJECT_ID` — *Settings → Secrets and variables → Actions → Variables*.
+    Mapped into the workflow env by `build-preview.yml` / `build-release.yml` (`${{ vars.* }}`).
+  - EAS project env vars on the **`preview`** environment only ([expo.dev](https://expo.dev) →
+    Dashboard → project → **Environment variables**): same three Firebase values **plus**
+    `API_BASE_URL_DEV = https://starter-api-dev-906316354955.europe-west2.run.app`.
+    ⚠️ must be the **HTTPS** DEV Cloud Run URL — plain `http://localhost:8080` fails closed
+    (`EAS preview/DEV builds require a DEV HTTPS API URL`). Do **not** use the `production`
+    environment for these.
+
+  **2. Android keystore (one-time, interactive):** CI runs `eas build --non-interactive`, which
+  **cannot generate a keystore** ("Generating a new Keystore is not supported in --non-interactive
+  mode"). Create it once locally:
+  ```bash
+  cd starter-mobile && set -a; . ./.env; set +a
+  npx eas-cli@16 build --profile preview --platform android   # answer: Generate keystore? yes
+  ```
+  (Ctrl-C after "✔ Created keystore" if you like — CI then reuses it.)
+
+  **3. iOS credentials for the RIGHT bundle id:** iOS credentials are per identifier, and the
+  interactive run resolves the identifier from `app.config.ts`. If you run it without the profile
+  override you'll create credentials for `com.starter.mobile.dev` and CI (which builds
+  `com.starter.mobile.preview`) will still fail with "couldn't find any credentials suitable for
+  internal distribution". Always force the variant:
+  ```bash
+  EAS_BUILD_PROFILE=preview npx eas-cli@16 build --profile preview --platform ios
+  ```
+  Prompts: Apple login (+2FA) → register `com.starter.mobile.preview` → reuse distribution cert →
+  select your devices for the ad-hoc profile → build starts. Needs paid Apple Developer Program.
+
+  **4. `app.config.ts` must be PLAIN JavaScript** — see its own dropdown below. This one produced
+  three consecutive cloud-only failures that never reproduce locally.
+
+  Then: push to `main` (auto-triggers) or **Actions → EAS Build DEV → Run workflow**. Watch at
+  [starter-mobile/actions](https://github.com/patrikbego/starter-mobile/actions) and
+  [expo.dev builds](https://expo.dev/accounts/p4trik/projects/starter-mobile/builds). Install via
+  the QR/link Expo shows, confirm DEV identifiers (`com.starter.mobile.preview`,
+  `startermobile-preview` scheme).
+  </details>
+  <details><summary><strong>⚠️ app.config.ts is evaluated as PLAIN JS on EAS</strong> (cloud-only trap)</summary>
+
+  The EAS cloud **"Read app config"** phase parses `app.config.ts` with a Node that does **no
+  TypeScript transformation whatsoever** — while every local Node ≥ 22 strips types transparently.
+  So config bugs pass locally and only fail on the cloud builder. Empirical map (all hit live):
+
+  | TS construct | Cloud parser error |
+  |---|---|
+  | bare alias `type Variant = …` | `Unexpected identifier 'Variant'` |
+  | inline union `const v: 'a' \| 'b' = …` | `Missing initializer in const declaration` |
+  | typed signature `function f(p: T): R {}` | `Unexpected token ':'` |
+  | importing a `.ts` module (e.g. `envValidation.ts`) | same parser → dies on that file too |
+
+  Rules for this file (enforced since `779df71`): no `type`/`interface`, no inline annotations,
+  no `as` casts, no typed signatures, no `.ts` imports — top-of-file `// @ts-nocheck`, and the
+  build-time env guards are an inlined plain-JS copy of [`src/config/envValidation.ts`](../starter-mobile/src/config/envValidation.ts)
+  rules (that file stays canonical + unit-tested). To test a change before pushing, parse it as
+  plain JS under an old Node:
+  ```bash
+  cp app.config.ts /tmp/cfg.mjs && node --input-type=module -e "import('/tmp/cfg.mjs')" \
+    # run with Node <=20 or any Node without type-stripping
+  ```
   </details>
 - [ ] Tag a release (`git tag v0.1.0 && git push --tags`) → `build-release` builds store-signed
       candidate, uploads `mobile-release-metadata.json`.
@@ -449,16 +509,22 @@ Backend and mobile promote independently; they meet only at the versioned API co
 | `FIREBASE_WEB_API_KEY`, `FIREBASE_TEST_USER_*` | backend | GitHub secret (optional auth smoke) |
 | `SLACK_WEBHOOK` | backend | GitHub secret (optional alerts) |
 | `EXPO_TOKEN` | mobile | GitHub secret |
-| iOS/Android EAS credentials | mobile | EAS (not GitHub) |
+| `EXPO_PUBLIC_FIREBASE_*` (3 vars) | mobile | GitHub repo **variables** + EAS `preview` environment (both needed — runner env *and* cloud build env) |
+| `API_BASE_URL_DEV` | mobile | EAS `preview` environment (HTTPS Cloud Run URL, not localhost) |
+| iOS/Android EAS credentials | mobile | EAS (not GitHub); created via one-time interactive local builds |
 | `ios.ascAppId` in `eas.json` | mobile | file (set to real value) |
 | `production` environment | both | GitHub Settings → Environments (reviewers = paid plan, skipped; `main`-only branch policy set) |
 
-Current position (2026-08-22, late): **§2 + §3 complete — DEV and PROD both green.**
+Current position (2026-08-23): **§2 + §3 complete; §5 mid-flight on the first preview build.**
 - DEV: run [32593078612](https://github.com/patrikbego/starter-backend/actions/runs/32593078612),
   revision `starter-api-dev-00003-n9l`, promotable.
 - PROD: run [32598761852](https://github.com/patrikbego/starter-backend/actions/runs/32598761852)
   promoted that exact digest → `starter-api-prod-00002-czt` at
   `https://starter-api-prod-pi7t6ivt6q-nw.a.run.app` (health 200s, unauth `/me` 401).
+- Mobile: EAS linked, eas-cli pinned, Firebase/API env wired (GitHub variables + EAS `preview`
+  env), Android keystore + iOS dev/preview credentials created, encryption-exemption flag set,
+  and `app.config.ts` rewritten as plain JS after three cloud-only parse failures. First green
+  preview build still pending at last update.
 - Sonar gates green (backend 93.8 / mobile 87.1 new coverage). Plan-gated items consciously
   skipped: branch protection, environment required-reviewers (both repos), Code Scanning SARIF.
 Still open: §4 rollback drill (DEV, then PROD window); optional Firebase test-user secrets +
