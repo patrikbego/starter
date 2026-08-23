@@ -3,7 +3,7 @@
 Everything below is **live-setup work** (real GitHub/EAS/cloud accounts). All Step 5 *code and
 runbooks* are done and `actionlint`-clean. Work top-to-bottom; each phase's Done unlocks the next.
 Status is updated as we go (last update 2026-08-23, after preview-build debugging: env wiring,
-credentials, plain-JS config).
+credentials, plain-JS config, submission-vs-worker env split).
 
 Two independent repos: `starter-backend` (Spring Boot, Cloud Run) and `starter-mobile` (Expo/EAS).
 Backend and mobile promote independently; they meet only at the versioned API contract.
@@ -416,10 +416,16 @@ Backend and mobile promote independently; they meet only at the versioned API co
   **1. Secrets + variables (both stores!):**
   - GitHub repo secret `EXPO_TOKEN` (authenticates `eas build` in CI) — *Settings → Secrets and
     variables → Actions*.
-  - GitHub repo **variables** (public client config; the runner's own `expo config` read needs them
-    as process env): `EXPO_PUBLIC_FIREBASE_API_KEY`, `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN`,
-    `EXPO_PUBLIC_FIREBASE_PROJECT_ID` — *Settings → Secrets and variables → Actions → Variables*.
-    Mapped into the workflow env by `build-preview.yml` / `build-release.yml` (`${{ vars.* }}`).
+  - GitHub repo **variables** (public client config; the runner's own `expo config` read needs
+    them as process env): `EXPO_PUBLIC_FIREBASE_API_KEY`, `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN`,
+    `EXPO_PUBLIC_FIREBASE_PROJECT_ID`, and `API_BASE_URL_DEV` (required by the
+    `EAS_BUILD_PROFILE=preview` submission guard — see the split dropdown below) —
+    *Settings → Secrets and variables → Actions → Variables*. Mapped into the workflow env by
+    `build-preview.yml` / `build-release.yml` (`${{ vars.* }}`). Set via CLI:
+    ```bash
+    gh variable set API_BASE_URL_DEV -R patrikbego/starter-mobile \
+      --body 'https://starter-api-dev-906316354955.europe-west2.run.app'
+    ```
   - EAS project env vars on the **`preview`** environment only ([expo.dev](https://expo.dev) →
     Dashboard → project → **Environment variables**): same three Firebase values **plus**
     `API_BASE_URL_DEV = https://starter-api-dev-906316354955.europe-west2.run.app`.
@@ -461,7 +467,8 @@ Backend and mobile promote independently; they meet only at the versioned API co
   - 🤖 **Android: FINISHED** — build [`4e101e72`](https://expo.dev/accounts/p4trik/projects/starter-mobile/builds/4e101e72-61c4-4f0a-8766-37e885a828b1),
     installable via the QR/link Expo prints.
   - 🍏 **iOS: failed** at *Configure Xcode project* (build [`7fef7804`](https://expo.dev/accounts/p4trik/projects/starter-mobile/builds/7fef7804-94b8-4624-82bc-8e075eda9e82))
-    — next fix pending that phase's log.
+    — root cause: the **submission-vs-worker config split** (⚠️ dropdown below). Workflow fix
+    pushed (`EAS_BUILD_PROFILE` + API URL as runner env); rerun pending.
   </details>
   <details><summary><strong>⚠️ app.config.ts is evaluated as PLAIN JS on EAS</strong> (cloud-only trap)</summary>
 
@@ -485,6 +492,40 @@ Backend and mobile promote independently; they meet only at the versioned API co
   cp app.config.ts /tmp/cfg.mjs && node --input-type=module -e "import('/tmp/cfg.mjs')" \
     # run with Node <=20 or any Node without type-stripping
   ```
+  </details>
+  <details><summary><strong>⚠️ Submission vs worker: app.config.ts is evaluated TWICE with different env</strong> (iOS target mismatch)</summary>
+
+  `eas build` evaluates the config on the **GitHub runner** (submission) and again on the
+  **EAS worker** (prebuild + credentials apply). The worker injects `EAS_BUILD_PROFILE`; the
+  **runner does not**. Variant resolution keys on that var
+  ([app.config.ts](../starter-mobile/app.config.ts)), so the two evals disagreed — hit live on
+  run [32639104615](https://github.com/patrikbego/starter-mobile/actions/runs/32639104615):
+
+  | Config eval | Env | Resolves to | Xcode target | Bundle id |
+  |---|---|---|---|---|
+  | submission (runner) | no `EAS_BUILD_PROFILE` | development | `Starterdev` | `com.starter.mobile.dev` |
+  | worker (builder) | injects `EAS_BUILD_PROFILE=preview` | preview | `Starterpreview` | `com.starter.mobile.preview` |
+
+  EAS fetched the **dev** AdHoc profile at submission, then tried to attach it to a target named
+  `Starterdev` inside the *preview* project prebuild had just generated:
+  ```
+  Assigning provisioning profile '*[expo] com.starter.mobile.dev AdHoc …' to target 'Starterdev'
+  Could not find target 'Starterdev' in project.pbxproj
+  ```
+  Android survived the same split because keystore assignment never touches pbxproj targets.
+
+  Fix (in both workflows): export the profile on the runner too, **plus** whatever the config
+  guards require once `isEasBuild` turns true at submission —
+  - `build-preview.yml`: job env `EAS_BUILD_PROFILE: preview` +
+    `API_BASE_URL_DEV: ${{ vars.API_BASE_URL_DEV }}` (repo variable; CLI set above).
+  - `build-release.yml`: `EAS_BUILD_PROFILE: production` + `APP_ENV: production` (pairs the
+    profile guard) + `API_BASE_URL_PROD: ${{ vars.API_BASE_URL_PROD }}`.
+
+  Verified locally: with the runner envs above, `expo config --json --full` resolves exactly what
+  each worker resolves — `Starter (preview)` / `com.starter.mobile.preview` and
+  `Starter` / `com.starter.mobile`.
+  Rule of thumb: **any env var the cloud build reads through app.config.ts must also exist in the
+  workflow's job env** — EAS-dashboard variables only ever reach the worker.
   </details>
 - [ ] Tag a release (`git tag v0.1.0 && git push --tags`) → `build-release` builds store-signed
       candidate, uploads `mobile-release-metadata.json`.
@@ -517,7 +558,8 @@ Backend and mobile promote independently; they meet only at the versioned API co
 | `SLACK_WEBHOOK` | backend | GitHub secret (optional alerts) |
 | `EXPO_TOKEN` | mobile | GitHub secret |
 | `EXPO_PUBLIC_FIREBASE_*` (3 vars) | mobile | GitHub repo **variables** + EAS `preview` environment (both needed — runner env *and* cloud build env) |
-| `API_BASE_URL_DEV` | mobile | EAS `preview` environment (HTTPS Cloud Run URL, not localhost) |
+| `API_BASE_URL_DEV` | mobile | GitHub repo **variable** + EAS `preview` environment (HTTPS DEV Cloud Run URL; runner config-read *and* cloud build) |
+| `API_BASE_URL_PROD` (+ `APP_ENV`) | mobile | GitHub repo **variable**; `build-release.yml` runner-side config read |
 | iOS/Android EAS credentials | mobile | EAS (not GitHub); created via one-time interactive local builds |
 | `ios.ascAppId` in `eas.json` | mobile | file (set to real value) |
 | `production` environment | both | GitHub Settings → Environments (reviewers = paid plan, skipped; `main`-only branch policy set) |
@@ -531,8 +573,9 @@ Current position (2026-08-23): **§2 + §3 complete; §5 mid-flight on the first
 - Mobile: EAS linked, eas-cli pinned, Firebase/API env wired (GitHub variables + EAS `preview`
   env), Android keystore + iOS dev/preview credentials created, encryption-exemption flag set,
   and `app.config.ts` rewritten as plain JS after three cloud-only parse failures.
-  **First Android preview build finished** (build `4e101e72`); iOS still failing at
-  *Configure Xcode project* (build `7fef7804`).
+  **First Android preview build finished** (build `4e101e72`); iOS failed on the
+  submission-vs-worker variant split (`Starterdev` target mismatch) — both workflows now export
+  `EAS_BUILD_PROFILE` + API URL vars on the runner; rerun pending.
 - Sonar gates green (backend 93.8 / mobile 87.1 new coverage). Plan-gated items consciously
   skipped: branch protection, environment required-reviewers (both repos), Code Scanning SARIF.
 Still open: §4 rollback drill (DEV, then PROD window); optional Firebase test-user secrets +
