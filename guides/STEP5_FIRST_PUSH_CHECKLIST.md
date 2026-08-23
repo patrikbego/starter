@@ -407,7 +407,12 @@ Backend and mobile promote independently; they meet only at the versioned API co
       branch policy `main`-only is set. Add reviewers when on a Team/public plan.
 - [x] Mark mobile as a **template repository** — `<mobile repo> → Settings → General → ☑ "Template repository"`.
 
-- [ ] Build DEV preview (`build-preview` workflow); install on a device, confirm DEV identifiers.
+- [x] Build DEV preview (`build-preview` workflow); install on a device, confirm DEV identifiers.
+      ✅ **First fully green CI run: 2026-08-23, run [32642572465](https://github.com/patrikbego/starter-mobile/actions/runs/32642572465)** —
+      🤖 Android [`af409ba0`](https://expo.dev/accounts/p4trik/projects/starter-mobile/builds/af409ba0-c2b3-462a-a92b-b55b28e1c2b9)
+      · 🍏 iOS [`2e85928c`](https://expo.dev/accounts/p4trik/projects/starter-mobile/builds/2e85928c-c2ec-4373-8c62-9fb927ede674).
+      Still open: install via the QR/link Expo prints and confirm identifiers on a real device
+      (`com.starter.mobile.preview`, scheme `startermobile-preview`).
   <details><summary><strong>Steps + settings paths</strong> (click-path)</summary>
 
   The preview build needs **four** things wired before it goes green. Each was a real failure on
@@ -478,6 +483,10 @@ Backend and mobile promote independently; they meet only at the versioned API co
     variant split gone, but Android now died at submission with `Generating a new Keystore is not
     supported in --non-interactive mode` — expected: the fix makes CI request the
     `com.starter.mobile.preview` package, whose keystore wasn't minted yet (box 2 above).
+  - ✅ **Final: run [32642572465](https://github.com/patrikbego/starter-mobile/actions/runs/32642572465)
+    green end-to-end** ("Test commit", 13:30→14:48 UTC) after minting the `.preview` keystore
+    interactively — 🤖 [`af409ba0`](https://expo.dev/accounts/p4trik/projects/starter-mobile/builds/af409ba0-c2b3-462a-a92b-b55b28e1c2b9)
+    · 🍏 [`2e85928c`](https://expo.dev/accounts/p4trik/projects/starter-mobile/builds/2e85928c-c2ec-4373-8c62-9fb927ede674).
   </details>
   <details><summary><strong>⚠️ app.config.ts is evaluated as PLAIN JS on EAS</strong> (cloud-only trap)</summary>
 
@@ -582,9 +591,9 @@ Current position (2026-08-23): **§2 + §3 complete; §5 mid-flight on the first
 - Mobile: EAS linked, eas-cli pinned, Firebase/API env wired (GitHub variables + EAS `preview`
   env), Android keystore + iOS dev/preview credentials created, encryption-exemption flag set,
   and `app.config.ts` rewritten as plain JS after three cloud-only parse failures.
-  **First Android preview build finished** (build `4e101e72`); iOS failed on the
-  submission-vs-worker variant split (`Starterdev` target mismatch) — both workflows now export
-  `EAS_BUILD_PROFILE` + API URL vars on the runner; rerun pending.
+  **Preview build GREEN end-to-end (run 32642572465):** 🤖 `af409ba0` + 🍏 `2e85928c`, both built
+  by CI after the variant-split fix (`090c0ea`) + minting the `.preview` keystore. Still open:
+  device-install check; next box is tag `v0.1.0` → `build-release`.
 - Sonar gates green (backend 93.8 / mobile 87.1 new coverage). Plan-gated items consciously
   skipped: branch protection, environment required-reviewers (both repos), Code Scanning SARIF.
 Still open: §4 rollback drill (DEV, then PROD window); optional Firebase test-user secrets +
