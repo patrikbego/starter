@@ -37,10 +37,10 @@ patrikbego/starter-mobile  ──"Use this template"──▶ patrikbego/<app>-m
 | TF state bucket | one per app | `gs://starter-tfstate-myapp` |
 | iOS bundle IDs | keep the variant suffixes — side-by-side installs depend on them | `com.starter.myapp` / `.dev` / `.preview` |
 | Android package | same | `com.starter.myapp(.dev/.preview)` |
-| URL schemes | `startermobile-*` pattern → `<slug>mobile-*` | `mymobileapp-dev`, `-preview`, bare for prod |
+| URL schemes | template pattern = repo slug de-hyphenated (`starter-mobile` → `startermobile`) | `myappmobile-dev`, `-preview`, bare for prod |
 | Display names | `"MyApp"` / `"MyApp (dev)"` / `"MyApp (preview)"` | |
 | Sonar project keys | `<repo-name>` | `myapp-backend`, `myapp-mobile` |
-| EAS project name | = slug (immutable once linked!) | `myapp` |
+| EAS project name & app slug | match the template convention: slug = `<slug>-mobile` (immutable once linked!) | `myapp-mobile` |
 
 ⚠️ **EAS slugs are immutable once set** and locked to the project id (Step 5 pain). Pick once.
 
@@ -60,6 +60,8 @@ The core question of this guide. Same computer, same accounts:
 | Firebase | ❌ new | new project per app (DEV + PROD), new Web-app registration per project, new test users; never point an app's prod binary at another app's Firebase |
 | Play Console ($25 once) | ✅ account fee is one-time | new app entry per Android app + its own signing/upload key flow |
 | Sonar (localhost:9000) | ✅ reuse server | new project keys; run `local-gate.sh <new-key>` |
+| `FIREBASE_WEB_API_KEY` + `FIREBASE_TEST_USER_EMAIL/_PASSWORD` (optional auth smoke, future E2E) | ❌ new values | from THIS app's DEV Firebase project; same secret names as the template |
+| `SLACK_WEBHOOK` (optional deploy-failure alerts) | ❌ new if used | per-repo secret; a shared webhook would misroute alerts between apps |
 | `gh` CLI auth | ✅ reuse | — |
 | `gcloud` / ADC | ✅ reuse | `gcloud config set project <new-dev-project>` before terraform runs |
 | eas-cli pin (`>=16 <17`) | ✅ same pin | revisit only on an SDK bump (see Step 5 §5 trap) |
@@ -84,9 +86,10 @@ The core question of this guide. Same computer, same accounts:
       | File | Change |
       |---|---|
       | `infra/dev.tfvars` + `infra/prod.tfvars` | `app` → `myapp`, `project_id` → your new unique IDs, `artifact_repository_id` → e.g. `myapp-api`, `github_organization` stays `patrikbego`, `github_repository` → `myapp-backend`. ⚠️ `REPLACE_ME_ORG` breaks WIF silently — exact-repo match (Step 5 §2) |
-      | `.github/workflows/deploy-dev.yml` | `IMAGE_NAME: starter-api` → `myapp-api`, `SERVICE_NAME: starter-api-dev` → `myapp-api-dev`, the `--set-env-vars` CORS origins stay as-is (localhost ports unchanged), service-account flag uses the new SA name, `PROJECT_ID` env points at the new DEV project |
-      | `.github/workflows/promote-prod.yml` | same three renames for PROD |
+      | `.github/workflows/deploy-dev.yml` | env block (~line 31): `PROJECT_ID` → new DEV id, `IMAGE_NAME` → `myapp-api`, `SERVICE_NAME` → `myapp-api-dev`, and **`ARTIFACT_REPOSITORY` → must equal `artifact_repository_id` in tfvars** (push targets `<region>-docker.pkg.dev/<project>/<ARTIFACT_REPOSITORY>/<IMAGE_NAME>`); CORS origins in `--set-env-vars` stay as-is (localhost ports unchanged); line 160's `--service-account starter-api@…` → `myapp-api@…` (the WIF-authed steps use secrets — nothing else is name-bound) |
+      | `.github/workflows/promote-prod.yml` | same five env values for PROD + its own `--service-account`; the example digest at ~line 18 still shows the old `starter-demo-dev/starter/starter-api` path — cosmetic, update to avoid confusion |
       | `scripts/local-gate.sh` usage | pass the new key at run time: `./scripts/local-gate.sh myapp-backend` (no file edit needed) |
+      | docs + `openapi.yaml` info block | cosmetic — mentions of `starter` in README/docs and the API title/version string; update at will, nothing name-bound |
       | optional template improvement | make `plan.sh`'s `prefix=starter-${ENV}` read `TFSTATE_PREFIX` (then use `myapp-${ENV}`) — otherwise rely on the per-app bucket from §2 |
 - [ ] Local gate green: `./scripts/local-gate.sh myapp-backend` (Sonar shows up under the new
       key automatically once scanned).
@@ -123,6 +126,7 @@ The core question of this guide. Same computer, same accounts:
       `/health/*` 200, unauth `/api/v1/me` 401. Copy the DEV URL — the mobile repo needs it.
 - [ ] PROD mirror: `prod.tfvars` → plan/apply prod → `_PROD` secrets → **two** cross-project
       grants on the DEV registry (deployer SA **and** `service-<PROJ_NUM>@serverless-robot-prod.iam…`)
+      → `./scripts/set-secrets.sh prod --openai-api-key 'sk-or-v1-…' --actuator-password '<strong>'`
       → dispatch **Promote to PROD** with the digest from DEV's `release-metadata.json`.
 
 ## 4. Mobile bring-up (`<app>-mobile`)
@@ -138,7 +142,7 @@ The core question of this guide. Same computer, same accounts:
       ```
       | File | Change |
       |---|---|
-      | `app.config.ts` | all six bundle/package ids in `VARIANT_CONFIGS` (`com.starter.myapp{,.dev,.preview}`), three schemes (`mymobileapp*`), displayNames, and `extra.eas.projectId` fallback (**placeholder until 4c**) |
+      | `app.config.ts` | all six bundle/package ids in `VARIANT_CONFIGS` (`com.starter.myapp{,.dev,.preview}`), three schemes (`myappmobile{,-dev,-preview}`), displayNames, and `extra.eas.projectId` fallback (**placeholder until 4c**) |
       | `eas.json` | leave `cli.version` pin; `submit.production.ios.ascAppId` stays `REPLACE_ME` until store step |
       | `package.json` | `name` field → `myapp-mobile` |
       ⚠️ **`app.config.ts` must stay 100% plain JavaScript** — the EAS cloud parses it without TS
@@ -153,11 +157,16 @@ The core question of this guide. Same computer, same accounts:
       ```
       ⚠️ dynamic-config wrinkle again: capture the printed project id, put it in
       `extra.eas.projectId ?? '<id>'` fallback, and in `.env` (`EAS_PROJECT_ID=…`).
-- [ ] Firebase: create `myapp-dev` project → register **Web app** → Email/Password enabled →
-      put the new `EXPO_PUBLIC_FIREBASE_*` trio as repo **variables** AND EAS `preview`
-      environment vars (both places — runner env *and* cloud build env; Step 5 §5).
+- [ ] Firebase: create the DEV project (e.g. `starter-local-myapp`) → register **Web app** →
+      Email/Password enabled → put the new `EXPO_PUBLIC_FIREBASE_*` trio as repo **variables**
+      AND EAS `preview` environment vars (both places — runner env *and* cloud build env; Step 5 §5).
+      ⚠️ name projects to respect the env guards (`src/config/envValidation.ts:31`): a PROD
+      build fails if `EXPO_PUBLIC_FIREBASE_PROJECT_ID` matches `-dev([.-]|$)`; DEV/preview builds
+      fail on `-prod` ids. Keep dev/prod Firebase ids unambiguous.
 - [ ] Repo variables: `API_BASE_URL_DEV=https://myapp-api-dev….run.app` (your new deploy!),
-      plus `API_BASE_URL_PROD` when PROD exists. Workflows read `${{ vars.* }}`.
+      plus `API_BASE_URL_PROD` when PROD exists. Workflows read `${{ vars.* }}`. ⚠️ same
+      dual-location rule as the Firebase trio: `API_BASE_URL_DEV` must ALSO exist in the EAS
+      `preview` environment — repo variables reach only the runner, EAS env only the worker.
 - [ ] Mint native credentials **for this app's identifiers** (per-package/per-bundle-id —
       nothing is inherited from the template):
       ```bash
