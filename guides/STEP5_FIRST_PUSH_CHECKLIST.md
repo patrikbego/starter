@@ -2,7 +2,7 @@
 
 Everything below is **live-setup work** (real GitHub/EAS/cloud accounts). All Step 5 *code and
 runbooks* are done and `actionlint`-clean. Work top-to-bottom; each phase's Done unlocks the next.
-Status is updated as we go (last update 2026-08-22, after DEV infra applied).
+Status is updated as we go (last update 2026-08-23, after EAS project linked + CI pins).
 
 Two independent repos: `starter-backend` (Spring Boot, Cloud Run) and `starter-mobile` (Expo/EAS).
 Backend and mobile promote independently; they meet only at the versioned API contract.
@@ -43,23 +43,38 @@ Backend and mobile promote independently; they meet only at the versioned API co
 
 - [x] `starter-backend` pushed to `origin/main` (2026-08-19); CI green.
 - [x] `starter-mobile` pushed to `origin/main`; CI green.
-- [x] **Branch protection** on `main` for both repos: require PR + required check `verify` (backend) /
-      CI checks (mobile) + owners review. **Skipped — requires a paid plan** (free personal plan;
-      staying on direct push, decided 2026-08-20). Revisit on Team/public visibility.
-  *Later:* `<repo> -> Settings -> Branches (left, under "Code and automation") -> Add branch
-  protection rule -> "main" -> ☑ Require a pull request before merging (+ approvals, dismiss stale
-  approvals) -> ☑ Require status checks to pass -> select `verify` (backend) / `ci` (mobile)
-  -> ☑ Require review from Code Owners (needs `CODEOWNERS` in the repo) -> Create rule. Do both repos.*
-- [x] Enable **Dependabot alerts/updates**, **secret scanning / push protection** (both repos)
-      (done 2026-08-20).
-  *Reference path: `<repo> -> Settings -> Security analysis` (left, "Security") -> toggle on:
-  Dependabot alerts, Dependabot security updates, Secret scanning, push protection. Version updates:
-  same page -> Dependabot block -> "Create config" (writes `.github/dependabot.yml`).*
-- [x] **Mark both as template repositories** (Settings → Template repository) so apps are copied.
-  *`patrikbego/starter-backend` and `patrikbego/starter-mobile` -> Settings -> General ->
-  scroll to the bottom of General -> ☑ "Template repository". Then a green **"Use this template"**
-  button appears for anyone with access (public if you flip visibility, private = access-restricted).*
+- [x] **GitHub repo settings** on both repos — branch protection + Dependabot/secret 
+      scanning + template flags. Done/skipped status and the full click-paths are in the
+      dropdown below.
+  <details><summary><strong>GitHub repo settings</strong> (click-path)</summary>
 
+- **Branch protection** on `main` (require PR + status check `verify`/`ci` + owners review) —
+  **Skipped: requires a paid plan** (free personal plan; staying on direct push, decided
+  2026-08-20). Revisit on Team/public visibility.
+  ```
+  <repo> -> Settings -> Branches (left, under "Code and automation") -> Add branch protection
+  rule -> branch "main"
+   -> require a pull request before merging (+ approvals, dismiss stale)
+   -> require status checks to pass -> select `verify` (backend) / `ci` (mobile)
+   -> require review from Code Owners (needs `CODEOWNERS` in the repo)
+  -> Create rule. DO BOTH REPOS.
+  ```
+- **Dependabot alerts/updates + secret scanning / push protection** — **done 2026-08-20**
+  (both repos):
+  ```
+  <repo> -> Settings -> Security analysis (left, "Security") -> toggle on:
+  Dependabot alerts, Dependabot security updates, Secret scanning, push protection.
+  Version updates: same page -> Dependabot block -> "Create config" (writes `.github/dependabot.yml`).
+  ```
+- **Mark both as template repositories** — **done 2026-08-20**, so copying the app starts the
+  whole tree:
+  ```
+  <repo> -> Settings -> General -> scroll to the bottom -> ☑ "Template repository"
+  ```
+  A green **"Use this template"** button appears for anyone with access (public if you flip
+  visibility, private = access-restricted).
+
+  </details>
 ## 2. Backend cloud + secrets (run on YOUR machine — needs gcloud auth + terraform)
 
 > gcloud auth happens on your machine; planning/applying are plain `terraform` CLI commands that
@@ -79,6 +94,22 @@ Backend and mobile promote independently; they meet only at the versioned API co
   gcloud auth application-default set-quota-project starter-demo-dev   # fixes ADC quota warnings
   gcloud config set project starter-demo-dev
   ```
+  <details><summary><strong>First run: no Google Cloud account yet?</strong> (click-path)</summary>
+
+  The gcloud commands above assume an existing Google account with a billing-linked GCP project.
+  Cloud Run and Artifact Registry compute on an active billing account (you hit a billing/403 error
+  otherwise), so a from-scratch setup needs:
+  ```
+  1. A Google account — [accounts.google.com](https://accounts.google.com) (sign in / create).
+  2. A Google Cloud account + enable a free trial at [cloud.google.com](https://cloud.google.com).
+  3. Create the project you deploy to (e.g. `starter-demo-dev`) at
+     [console.cloud.google.com](https://console.cloud.google.com) -> New Project.
+  4. Attach a billing account at [console.cloud.google.com/billing](https://console.cloud.google.com/billing)
+     (Cloud Run uses a live account; there is no free tier without billing enabled).
+  ```
+  Only then run the Auth command above. PROD reuses the same account and just creates a second project.
+  </details>
+
 - [x] **Create the Terraform state bucket** (one-time, 2026-08-22):
   ```bash
   gcloud storage buckets create gs://starter-tfstate --location=europe-west2
@@ -116,6 +147,20 @@ Backend and mobile promote independently; they meet only at the versioned API co
   *⚠️ template fix needed (committed): `set-secrets.sh` originally hard-coded
   `PROJECT_ID="starter-${ENV}"`; it now reads `project_id` from `<env>.tfvars`. Without the fix it
   targets the wrong project when your project id isn't literally `starter-dev`*
+  <details><summary><strong>Where to get the OpenAI-compatible API key (OpenRouter)</strong> (click-path)</summary>
+
+  The backend calls an OpenAI-compatible `/v1/chat/completions` endpoint. The template is wired
+  for an OpenRouter key (prefix `sk-or-v1-`), which needs its own (free) account:
+  ```
+  1. Sign up at [openrouter.ai](https://openrouter.ai).
+  2. Keys → Create API key -> copy the `sk-or-v1-…` string (shown once).
+  3. Add a small credit balance if needed (Chat Completions cost fractions of a cent per call).
+  ```
+  Pass it with `--openai-api-key` in `set-secrets.sh dev` and again for PROD. 
+  *⚠️ The 2026-08-22 run captured a truncated key (`sk-or-v1-cae7…`); if `/api/v1/ai/chat` returns
+  401, re-run `set-secrets.sh dev` with the full key.*
+  </details>
+
 - [ ] **Optional** DEV secrets for the authenticated smoke: `FIREBASE_WEB_API_KEY`,
       `FIREBASE_TEST_USER_EMAIL`, `FIREBASE_TEST_USER_PASSWORD` (GitHub).
   <details><summary><strong>Where to get each</strong> (click-path)</summary>
@@ -136,11 +181,21 @@ Backend and mobile promote independently; they meet only at the versioned API co
      this account exists purely so CI can prove an authorized `/api/v1/me` returns 200.
   </details>
 - [ ] **Optional** `SLACK_WEBHOOK` (GitHub secret) for the failure alert.
-  *Get it at [api.slack.com/apps](https://api.slack.com/apps) → **Create New App → From scratch**
-  → pick your workspace → **Incoming Webhooks** → toggle Activate → **Add New Webhook to
-  Workspace** → choose a channel → copy the `https://hooks.slack.com/services/T…/B…/…` URL into
-  the GitHub secret. Without it, deploy failures only show in the Actions run (Notify job still
+  <details><summary><strong>Create a Slack Incoming Webhook</strong> (click-path)</summary>
+
+  Needs a Slack workspace you can admin. Full click-path:
+  ```
+  1. Go to [api.slack.com/apps](https://api.slack.com/apps).
+  2. Create New App -> From scratch -> name it + pick a workspace -> Create App.
+  3. Incoming Webhooks (left) -> toggle Activate.
+  4. Add New Webhook to Workspace (below) -> pick a channel -> Allow.
+  5. Copy the `https://hooks.slack.com/services/T…/B…/…` URL into
+     `<backend repo> -> Settings -> Secrets and variables -> Actions -> New repository secret`,
+     named `SLACK_WEBHOOK`.
+  ```
+  *Without it, a deploy failure shows up only as a failing Actions run (the `notify` job still
   succeeds silently).*
+  </details>
 - [x] **Trigger `Deploy to DEV`** (push to main or workflow_dispatch), confirm the chain
       `verify → build-and-push → deploy-dev → smoke-dev` green and `release-metadata.json` uploaded
       (`backend-artifacts` / `release-metadata` artifacts). If smoke fails: check the notify job /
@@ -247,8 +302,21 @@ Backend and mobile promote independently; they meet only at the versioned API co
   stale `PROJECT_ID` in `promote-prod.yml` (fixed `03039f1`), then the service-agent pull grant.
 - [x] Reserve PROD-only firebase/other values strictly apart from DEV.
       PROD Secret Manager has its own `openai-api-key` / `actuator-password`; DEV and PROD never
-      share values. *Still pending: registering a Firebase web app in `starter-demo-prod` for
-      mobile PROD auth (needed by §5–§6 store builds, not by the backend smoke).*
+      share values. *Still pending: registering a Firebase web app in the PROD project for
+      mobile PROD auth (needed by §5–§6 store builds, not by the backend smoke)* — recipe below.
+  <details><summary><strong>Register a Firebase web app in PROD</strong> (click-path)</summary>
+
+  Same flow as the DEV one in §2, but in the **PROD** project (`starter-demo-prod`) and with
+  strictly separated values:
+  ```
+  1. console.firebase.google.com → open project `starter-demo-prod` → ⚙️ Project settings
+     → General → Your apps.
+  2. No Web app yet? Click the Web icon, register one (hosting off).
+  3. Copy `firebaseConfig.apiKey`, `authDomain`, `projectId` for the PROD mobile config.
+  4. Enable Email/Password at Build → Authentication → Sign-in method (if not already on).
+  5. Keep PROD values out of the DEV secrets set; the mobile PROD build gets its own bucket.
+  ```
+  </details>
 
 ## 4. Backend rollback drill
 
@@ -263,11 +331,67 @@ Backend and mobile promote independently; they meet only at the versioned API co
 
 ## 5. Mobile
 
-- [ ] Set `EXPO_TOKEN` repo secret (mobile); create the EAS project (`eas init` → writes `eas.json`
+- [x] Set `EXPO_TOKEN` repo secret (mobile); create the EAS project (`eas init` → writes `eas.json`
       `projectId`) and install iOS/Android credentials (`eas credentials`).
+      ✅ **Done 2026-08-23**: `EXPO_TOKEN` set; EAS project `@p4trik/starter-mobile`
+      (id `420f02dd-d3b8-4c17-aa17-ad3ae37baaff`) linked via `eas init`. Needed two fixes first:
+      - **eas-cli version**: the pin was `latest`, which now resolves to eas-cli 22.x — and 22 breaks
+        against this template's Expo SDK 54 (`eas init` dies calling `expo config --type private`,
+        which SDK 54 rejects). Downgraded to `>=16 <17` in all three workflows + used `eas-cli@16`
+        locally. Re-pin if a later SDK changes the `--type` contract.
+      - **dynamic config**: `eas init` can't write `extra.eas.projectId` into a function-based
+        `app.config.ts` automatically → set it as the fallback in
+        `app.config.ts` (`process.env.EAS_PROJECT_ID ?? '<id>'`) and added `owner: 'p4trik'`.
+      `ios.ascAppId` + store credentials still pending — see the next box.
+  <details><summary><strong>EXPO_TOKEN / EAS project / credentials</strong> (click-path)</summary>
+
+  Two owned accounts gate this box: the **Expo account** (free) and, later, paid **store**
+  accounts. The project id is not a secret, so it can live in the repo; the token is.
+
+  **Expo account + `EXPO_TOKEN`:**
+  1. Create the free [Expo](https://expo.dev) account (owns the EAS project + all builds).
+  2. Token: expo.dev → top-right avatar → **Account Settings → Access → Secure Tokens →
+     Create new token**; name `github-actions-starter-mobile`; copy it — shown **once**.
+  3. GitHub secret: *`<mobile repo>` → Settings → Secrets and variables → Actions → New
+     repository secret* → name `EXPO_TOKEN`, value = token.
+     (Repo-level is fine even for `submit-release`; it runs under the `production` environment,
+     but repo secrets stay available there — no env-scoped copy needed.)
+
+  **Create the EAS project** — name it **`starter-mobile`**, matching the app `slug`. The slug is
+  immutable once set and is locked to the project id, so pick it once. Tie it to the repo via CLI:
+  ```bash
+  npm i -g eas-cli
+  cd starter-mobile
+  eas init
+  ```
+  First prompt → keep **New project** → name `starter-mobile` → pick your account/organization.
+  *⚠️ wrinkle:* `app.config.ts` here is a *dynamic* config, so `eas init` prints
+  `Cannot automatically write to dynamic config at: app.config.ts` and tells you to set
+  `extra.eas.projectId` yourself. Expected — capture the **project id** it creates and commit it as
+  the fallback in `app.config.ts` (`process.env.EAS_PROJECT_ID ?? '<project-id>'`). EAS injects
+  `EAS_PROJECT_ID` on every cloud build, so CI needs no other secret. (`eas.json` also sets
+  `cli.appVersionSource: remote`, so release versions are auto-incremented by EAS, not by code.)
+
+  **`eas credentials` / store builds (paid, not needed for the first box):**
+  1. **Apple** — [developer.apple.com](https://developer.apple.com), program membership $99/yr, for
+     iOS credentials + TestFlight + the `ascAppId`. **App Store Connect API key** (App Store Connect
+     → Users and Access → Integrations → App Store Connect API → Team Keys → generate, Admin/App
+     Manager role) registered with EAS so CI reaches TestFlight without your Apple password.
+  2. **Google** — Play Console 25 one-time, create an app + upload Android keystore, enable the
+     `internal` track (needed by §5's submit target).
+  </details>
 - [ ] Set `ios.ascAppId` in `eas.json` `submit.production.ios` (currently `REPLACE_ME`); confirm
       branch protection + Dependabot + secret scanning (never commit `.p8`/provisioning files).
       (Same Settings paths as [§1](#1-push-backend).)
+  <details><summary><strong>Actually: skip this until the store-submit step</strong> (context)</summary>
+
+  You only need `ascAppId` at the very last §5 box (`Submit release`). If App Store Connect shows
+  no apps under **Apps**, nothing is wrong — the id doesn't exist yet. It's created *after* you:
+  join the paid **Apple Developer Program** ($99/yr), accept the App Store Connect agreement, and
+  register the app's `ios.bundleIdentifier` (= `com.starter.mobile`). Then it appears under **Apps
+  → App Information → General Information → Apple ID**. So this box stays open until we reach the
+  store submit — build the DEV preview first (box below).
+  </details>
 - [x] Reviewer/protection rules on the mobile **`production` environment** too
       (Settings → Environments → production): add reviewers, disallow self-approval. Same as
       [§3](#3-backend-production) — it gates `submit-release.yml`, i.e. the store submission.
@@ -276,6 +400,23 @@ Backend and mobile promote independently; they meet only at the versioned API co
 - [x] Mark mobile as a **template repository** — `<mobile repo> → Settings → General → ☑ "Template repository"`.
 
 - [ ] Build DEV preview (`build-preview` workflow); install on a device, confirm DEV identifiers.
+  <details><summary><strong>Steps + settings paths</strong> (click-path)</summary>
+
+  1. **Commit and push the mobile changes** (the eas-cli 16 pin + the EAS-project linkage already
+     in `a9345f7`). This push **triggers the first preview build** (that's the workflow's only gate —
+     it also fires on any later push to `main`).
+  2. **Set the Firebase env vars on the EAS project** so CI can evaluate `app.config.ts` (it fails
+     closed without `EXPO_PUBLIC_FIREBASE_API_KEY`, `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN`,
+     `EXPO_PUBLIC_FIREBASE_PROJECT_ID`). Path:
+     [expo.dev](https://expo.dev) → **Dashboard → your EAS project → Environment variables** →
+     set the DEV/preview profile values **matching your [`.env`](starter-mobile/.env)**.
+  3. **Watch the run** go `eas build` → success → the workflow records the EAS build IDs.
+  4. **Install on a device** — Expo emails / shows a QR install link for internal-distribution
+     builds — then confirm the DEV identifiers (e.g. `com.starter.mobile.dev`, `startermobile-dev`
+     scheme).
+  5. **Manual re-run** (if not pushed): [github.com/patrikbego/starter-mobile](https://github.com/patrikbego/starter-mobile)
+     → **Actions → EAS Build DEV → Run workflow** → branch `main` → **Run**.
+  </details>
 - [ ] Tag a release (`git tag v0.1.0 && git push --tags`) → `build-release` builds store-signed
       candidate, uploads `mobile-release-metadata.json`.
 - [ ] Run `Submit release` with the recorded iOS/Android build IDs (needs the mobile `production`
