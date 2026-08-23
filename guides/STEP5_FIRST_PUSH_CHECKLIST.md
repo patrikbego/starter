@@ -409,7 +409,9 @@ Backend and mobile promote independently; they meet only at the versioned API co
      closed without `EXPO_PUBLIC_FIREBASE_API_KEY`, `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN`,
      `EXPO_PUBLIC_FIREBASE_PROJECT_ID`). Path:
      [expo.dev](https://expo.dev) → **Dashboard → your EAS project → Environment variables** →
-     set the DEV/preview profile values **matching your [`.env`](starter-mobile/.env)**.
+     set the **`preview`** environment (that's the one `build-preview`'s `preview` profile reads; do
+     **not** use `production` — that's only for the store-submit step), matching your
+     [`.env`](starter-mobile/.env) DEV values.
   3. **Watch the run** go `eas build` → success → the workflow records the EAS build IDs.
   4. **Install on a device** — Expo emails / shows a QR install link for internal-distribution
      builds — then confirm the DEV identifiers (e.g. `com.starter.mobile.dev`, `startermobile-dev`
