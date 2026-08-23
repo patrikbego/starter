@@ -14,3 +14,6 @@ shared-infra/sonar/.env
 
 # Agent scratch / rehearsal caches (regenerated, not source)
 .cache/
+
+# Agent instructions (local-only; never committed)
+AGENTS.md
