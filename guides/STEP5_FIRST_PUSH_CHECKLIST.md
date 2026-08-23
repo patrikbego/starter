@@ -455,6 +455,13 @@ Backend and mobile promote independently; they meet only at the versioned API co
   [expo.dev builds](https://expo.dev/accounts/p4trik/projects/starter-mobile/builds). Install via
   the QR/link Expo shows, confirm DEV identifiers (`com.starter.mobile.preview`,
   `startermobile-preview` scheme).
+
+  **Status 2026-08-23:** after all four fixes above landed (`779df71`), the run cleared
+  "Read app config" and produced the first real artifacts:
+  - 🤖 **Android: FINISHED** — build [`4e101e72`](https://expo.dev/accounts/p4trik/projects/starter-mobile/builds/4e101e72-61c4-4f0a-8766-37e885a828b1),
+    installable via the QR/link Expo prints.
+  - 🍏 **iOS: failed** at *Configure Xcode project* (build [`7fef7804`](https://expo.dev/accounts/p4trik/projects/starter-mobile/builds/7fef7804-94b8-4624-82bc-8e075eda9e82))
+    — next fix pending that phase's log.
   </details>
   <details><summary><strong>⚠️ app.config.ts is evaluated as PLAIN JS on EAS</strong> (cloud-only trap)</summary>
 
@@ -523,8 +530,9 @@ Current position (2026-08-23): **§2 + §3 complete; §5 mid-flight on the first
   `https://starter-api-prod-pi7t6ivt6q-nw.a.run.app` (health 200s, unauth `/me` 401).
 - Mobile: EAS linked, eas-cli pinned, Firebase/API env wired (GitHub variables + EAS `preview`
   env), Android keystore + iOS dev/preview credentials created, encryption-exemption flag set,
-  and `app.config.ts` rewritten as plain JS after three cloud-only parse failures. First green
-  preview build still pending at last update.
+  and `app.config.ts` rewritten as plain JS after three cloud-only parse failures.
+  **First Android preview build finished** (build `4e101e72`); iOS still failing at
+  *Configure Xcode project* (build `7fef7804`).
 - Sonar gates green (backend 93.8 / mobile 87.1 new coverage). Plan-gated items consciously
   skipped: branch protection, environment required-reviewers (both repos), Code Scanning SARIF.
 Still open: §4 rollback drill (DEV, then PROD window); optional Firebase test-user secrets +
