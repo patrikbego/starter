@@ -433,14 +433,19 @@ Backend and mobile promote independently; they meet only at the versioned API co
     (`EAS preview/DEV builds require a DEV HTTPS API URL`). Do **not** use the `production`
     environment for these.
 
-  **2. Android keystore (one-time, interactive):** CI runs `eas build --non-interactive`, which
-  **cannot generate a keystore** ("Generating a new Keystore is not supported in --non-interactive
-  mode"). Create it once locally:
+  **2. Android keystore (one-time, interactive) — and PER PACKAGE:** CI runs
+  `eas build --non-interactive`, which **cannot generate a keystore** ("Generating a new Keystore
+  is not supported in --non-interactive mode"). Keystores are looked up by **package name**, and
+  since the variant-split fix the CI build requests `com.starter.mobile.preview` — so that
+  package needs its own keystore minted once locally (the original `pItIhjhWCj` one belongs to
+  `com.starter.mobile.dev` and is what made pre-fix CI go green):
   ```bash
   cd starter-mobile && set -a; . ./.env; set +a
-  npx eas-cli@16 build --profile preview --platform android   # answer: Generate keystore? yes
+  EAS_BUILD_PROFILE=preview API_BASE_URL_DEV=https://starter-api-dev-906316354955.europe-west2.run.app \
+    npx eas-cli@16 build --profile preview --platform android   # answer: Generate keystore? yes
   ```
-  (Ctrl-C after "✔ Created keystore" if you like — CI then reuses it.)
+  (Ctrl-C after "✔ Created keystore" if you like — CI then reuses it. The env prefix is required:
+  without it the config resolves the DEV variant and you'd mint yet another `.dev` keystore.)
 
   **3. iOS credentials for the RIGHT bundle id:** iOS credentials are per identifier, and the
   interactive run resolves the identifier from `app.config.ts`. If you run it without the profile
@@ -469,6 +474,10 @@ Backend and mobile promote independently; they meet only at the versioned API co
   - 🍏 **iOS: failed** at *Configure Xcode project* (build [`7fef7804`](https://expo.dev/accounts/p4trik/projects/starter-mobile/builds/7fef7804-94b8-4624-82bc-8e075eda9e82))
     — root cause: the **submission-vs-worker config split** (⚠️ dropdown below). Workflow fix
     pushed (`EAS_BUILD_PROFILE` + API URL as runner env); rerun pending.
+  - **Rerun [32640910593](https://github.com/patrikbego/starter-mobile/actions/runs/32640910593):**
+    variant split gone, but Android now died at submission with `Generating a new Keystore is not
+    supported in --non-interactive mode` — expected: the fix makes CI request the
+    `com.starter.mobile.preview` package, whose keystore wasn't minted yet (box 2 above).
   </details>
   <details><summary><strong>⚠️ app.config.ts is evaluated as PLAIN JS on EAS</strong> (cloud-only trap)</summary>
 
