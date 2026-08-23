@@ -576,6 +576,8 @@ Backend and mobile promote independently; they meet only at the versioned API co
       (A5 drills, B1 device loop) once proven.
 - [ ] First app via **“Use this template”** from both repos: rename per-app identifiers, run the
       local gate, push — this is Step 6 (v1.0.0 trial).
+      **Full walkthrough: [`STEP6_NEW_APP_FROM_STARTER.md`](./STEP6_NEW_APP_FROM_STARTER.md)**
+      (identifier planning, shared-vs-new credentials matrix, per-repo rename inventories).
 
 ---
 
