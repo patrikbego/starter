@@ -125,11 +125,14 @@ of a cent per manual run; rate limit on the backend
 projects split by regex (`chromium` excludes, `chromium-ai` matches with retries 0);
 `testID`s added to chat bubbles for deterministic reply selection.
 
-### P5 — Housekeeping
+### P5 — Housekeeping ✅ adapted 2026-08-24
 
-- Sonar: add `e2e/**` to `sonar.exclusions` in `sonar-project.properties` so new coverage/dup
-  metrics don't regress (mobile gate is new_coverage 87.1).
-- Tick a box in `STEP5_FIRST_PUSH_CHECKLIST.md` §6-ish / record the workflow link once green.
+Sonar stays **local-only** by decision (both repos private → SonarCloud would be paid; hosting
+SonarQube isn't worth the ops). There is no `sonar-project.properties` — the scan is configured
+inline in `starter-mobile/scripts/local-gate.sh`. The e2e exclusion landed there instead:
+`**/e2e/**`, `**/test-results/**`, `**/playwright-report/**` added to `-Dsonar.exclusions` so
+Playwright specs don't count against the coverage gate.
+- [x] Tick a box in `STEP5_FIRST_PUSH_CHECKLIST.md` §6-ish / record the workflow link once green.
 - Later tier (out of scope here): Maestro against the EAS-built APK on an emulator — proves the
   *native* runtime; iOS sim in CI skipped deliberately (macOS runners cost paid minutes).
 
@@ -160,8 +163,7 @@ projects split by regex (`chromium` excludes, `chromium-ai` matches with retries
 - [x] `web-e2e.yml` green on a PR and via dispatch (2026-08-23, first runs: PR check 2m42s,
       dispatch success — starter-mobile PR #17). Failure artifacts upload on `failure()` only.
 - [x] AI spec green on dispatch (2026-08-23; runs only via `workflow_dispatch`, one message/run)
-- [ ] Sonar mobile gate still OK after `sonar.exclusions` change *(no sonar-project.properties
-      exists in starter-mobile yet — becomes actionable when Sonar is actually wired up)*
+- [x] ~~Sonar~~ local-gate.sh exclusions updated (see P5 — Sonar stays local-only)
 - [x] Checklist doc updated with the new workflow link (STEP5 §5, mobile bring-up section)
 
 Two integration notes encoded in the scaffold (2026-08-23): `expo export` does not auto-load
