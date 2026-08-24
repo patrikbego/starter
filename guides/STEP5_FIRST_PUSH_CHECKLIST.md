@@ -181,6 +181,12 @@ Backend and mobile promote independently; they meet only at the versioned API co
      Add user**, e.g. `smoke-test@starter-demo-dev.com` + a strong password. DEV-project-only;
      this account exists purely so CI can prove an authorized `/api/v1/me` returns 200.
   </details>
+
+  > ✅ **2026-08-23:** DEV Firebase is provisioned — Firebase added to GCP project
+  > `starter-demo-dev`, web app `starter-mobile-dev` registered, Email/Password enabled.
+  > `FIREBASE_WEB_API_KEY` would be `AIzaSyAPw9…` (same value as mobile's
+  > `EXPO_PUBLIC_FIREBASE_API_KEY`). Note the console-only bootstrap: Auth config doesn't exist
+  > until **Authentication → Get started** is clicked once; no API creates it.
 - [ ] **Optional** `SLACK_WEBHOOK` (GitHub secret) for the failure alert.
   <details><summary><strong>Create a Slack Incoming Webhook</strong> (click-path)</summary>
 
@@ -419,6 +425,13 @@ Backend and mobile promote independently; they meet only at the versioned API co
       · 🍏 iOS [`2e85928c`](https://expo.dev/accounts/p4trik/projects/starter-mobile/builds/2e85928c-c2ec-4373-8c62-9fb927ede674).
       Still open: install via the QR/link Expo prints and confirm identifiers on a real device
       (`com.starter.mobile.preview`, scheme `startermobile-preview`).
+
+- [x] Browser E2E gates PRs (`web-e2e` workflow, added 2026-08-23): Playwright drives the
+      exported web UI against Firebase DEV + live Cloud Run; AI round-trip is a separate
+      dispatch-only job. First green runs: PR check **2m42s**
+      ([32670865580](https://github.com/patrikbego/starter-mobile/actions/runs/32670865580))
+      + dispatch success. Design and decisions:
+      [`BROWSER_E2E_INTEGRATION_PLAN.md`](./BROWSER_E2E_INTEGRATION_PLAN.md).
   <details><summary><strong>Steps + settings paths</strong> (click-path)</summary>
 
   The preview build needs **four** things wired before it goes green. Each was a real failure on
@@ -437,12 +450,23 @@ Backend and mobile promote independently; they meet only at the versioned API co
     gh variable set API_BASE_URL_DEV -R patrikbego/starter-mobile \
       --body 'https://starter-api-dev-906316354955.europe-west2.run.app'
     ```
+    ⚠️ The Firebase trio must name the **same Firebase project the deployed backend verifies
+    tokens against** (one project per environment — mobile token `aud` must equal the backend
+    Admin SDK's project). A mismatch leaves sign-in working but every authenticated call 401s;
+    incident + resolution recorded 2026-08-23 (`starter-local-b9525` → `starter-demo-dev`,
+    found by the browser-E2E P0 spike). Same values must also live in the EAS `preview`
+    environment below — update both stores together.
   - EAS project env vars on the **`preview`** environment only ([expo.dev](https://expo.dev) →
     Dashboard → project → **Environment variables**): same three Firebase values **plus**
     `API_BASE_URL_DEV = https://starter-api-dev-906316354955.europe-west2.run.app`.
     ⚠️ must be the **HTTPS** DEV Cloud Run URL — plain `http://localhost:8080` fails closed
     (`EAS preview/DEV builds require a DEV HTTPS API URL`). Do **not** use the `production`
     environment for these.
+    > ⚠️ **Two stores, one truth** — incident 2026-08-23: the GitHub variables were updated to
+    > `starter-demo-dev` but the EAS `preview` store kept `starter-local-b9525`; whichever store
+    > a build reads from would silently bake the other project's auth config (the exact
+    > mobile↔backend mismatch that P0 caught). When changing the Firebase trio, update BOTH
+    > places in the same sitting and diff them against `.env`.
 
   **2. Android keystore (one-time, interactive) — and PER PACKAGE:** CI runs
   `eas build --non-interactive`, which **cannot generate a keystore** ("Generating a new Keystore

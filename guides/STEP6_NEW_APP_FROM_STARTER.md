@@ -157,8 +157,17 @@ The core question of this guide. Same computer, same accounts:
       ```
       ⚠️ dynamic-config wrinkle again: capture the printed project id, put it in
       `extra.eas.projectId ?? '<id>'` fallback, and in `.env` (`EAS_PROJECT_ID=…`).
-- [ ] Firebase: create the DEV project (e.g. `starter-local-myapp`) → register **Web app** →
-      Email/Password enabled → put the new `EXPO_PUBLIC_FIREBASE_*` trio as repo **variables**
+- [ ] Firebase: do **NOT** create a separate `*-local-*` project for DEV. Instead **add Firebase
+      to the same GCP project the backend deploys to** (e.g. `myapp-dev`): console → Add project
+      → import existing GCP project → register **Web app** → Email/Password enabled. One project
+      per environment keeps the mobile token `aud` aligned with what the backend's Admin SDK
+      verifies.
+      ⚠️ Incident 2026-08-23: mobile DEV pointed at a `starter-local-b9525` Firebase project while
+      the backend lived in `starter-demo-dev` → every `/api/v1/me` returned 401 (audience
+      mismatch) even though sign-in itself worked. Caught only by the browser-E2E P0 spike.
+      Also: a fresh project's Auth config does not exist until someone opens **Authentication →
+      Get started** once in the console — there is no API to create it.
+      Put the new `EXPO_PUBLIC_FIREBASE_*` trio as repo **variables**
       AND EAS `preview` environment vars (both places — runner env *and* cloud build env; Step 5 §5).
       ⚠️ name projects to respect the env guards (`src/config/envValidation.ts:31`): a PROD
       build fails if `EXPO_PUBLIC_FIREBASE_PROJECT_ID` matches `-dev([.-]|$)`; DEV/preview builds
