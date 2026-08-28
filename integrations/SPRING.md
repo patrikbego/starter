@@ -121,7 +121,17 @@ variable is `true`. You only provide the values.
       curl -s -o /dev/null -w '%{http_code}\n' https://<app>-api-dev.run.app/api/v1/billing/me
       # 401 without token; with a DEV Firebase token: 200 {"status":"none",…}
       ```
-- [ ] End-to-end with a **test card** (`4242 4242 4242 4242`, any future date/CVC):
+- [ ] **Automated E2E runs in CI** — `deploy-dev.yml` smoke job executes
+      [`scripts/billing-e2e.sh`](../starter-backend/scripts/billing-e2e.sh) whenever
+      `BILLING_ENABLED_DEV=true` (Stripe test mode; keys pulled from Secret Manager). It proves
+      the full server-side chain: anonymous sign-in → `billing/me` `none` → hosted Checkout URL →
+      Stripe customer (metadata `userId`) → real test subscription → **signed webhooks** →
+      `billing/me` `active` with `planId`/`currentPeriodEnd` → portal URL → subscription cleanup.
+      Prerequisites: `FIREBASE_WEB_API_KEY` secret, anonymous sign-in enabled, workflow SA may
+      read the two Stripe secrets. The E2E uses `tok_visa` (raw card numbers via API are
+      rejected); it validates the *backend* chain — it does not click through Checkout.
+- [ ] End-to-end with a **test card** (`4242 4242 4242 4242`, any future date/CVC) — the manual
+      click-through the CI E2E cannot do:
       1. App → Billing tab → **Upgrade** → hosted Checkout opens → pay.
       2. On return the app refetches; backend webhook set `status: active`.
       3. `GET /api/v1/billing/me` now returns `{"status":"active",…}`.
@@ -204,6 +214,14 @@ Nothing to configure on native — the app is contract-driven.
   `AI_ENABLED` to `true,AI_CHAT_MODEL=…`, startup fails with `failed to convert ... to boolean`,
   and Cloud Run reports the unhelpful "container failed to start". Never mix separators in one
   `--set-env-vars`; `promote-prod.yml` stays comma-delimited (no URLs there).
+- **`--set-env-vars`/`--set-secrets` REPLACE the whole environment on `gcloud run services
+  update`; `--update-env-vars`/`--update-secrets` merge.** A billing step that ran
+  `services update --set-env-vars "BILLING_…"` after the deploy step wiped the base env
+  (`SPRING_PROFILES_ACTIVE`, `GCP_PROJECT_ID`, `AI_*`, CORS) and base secrets — the service
+  came up but **every `verifyIdToken` rejected**, so all authenticated endpoints returned 401
+  while health checks stayed green. This is why the billing steps in `deploy-dev.yml` and
+  `promote-prod.yml` use `--update-*` exclusively. Corollary: after any env change, verify the
+  live env survived (`gcloud run services describe <svc> --format='yaml(spec.template.spec.containers[0].env,spec.template.spec.containers[0].resources)'`), not just that the deploy succeeded.
 
 ## Maintenance point
 
