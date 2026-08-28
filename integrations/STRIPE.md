@@ -1,4 +1,4 @@
-# SPRING.md — Stripe Subscription Billing Integration
+# STRIPE.md — Stripe Subscription Billing Integration
 
 **Status: implemented in the templates (2026-08-24), opt-in at runtime.** This runbook is the
 activation checklist for **one Stripe subscription price per environment** on the Spring Boot

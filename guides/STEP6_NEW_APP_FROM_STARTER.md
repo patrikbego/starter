@@ -57,6 +57,7 @@ The core question of this guide. Same computer, same accounts:
 | Google Cloud account + billing | ✅ reuse billing account | **new GCP projects per app, per env** (dev+prod); never share projects between products |
 | Terraform state bucket | ⚠️ **NOT as-is** | `scripts/plan.sh` hard-codes `prefix=starter-${ENV}` — reusing `gs://starter-tfstate` would collide with the original project's state. Either create `gs://<brand>-tfstate-<app>` (zero code change) or parameterize the prefix first |
 | OpenRouter account | ✅ reuse | **create a new API key per app** — per-app spend tracking; feed it to that app's Secret Manager only |
+| Stripe account (optional billing) | ✅ reuse account | **per app/env**: new product + price, new webhook endpoint, new API key + signing secret (test mode first, live for PROD). Full runbook: [`integrations/STRIPE.md`](../integrations/STRIPE.md) |
 | Firebase | ❌ new | new project per app (DEV + PROD), new Web-app registration per project, new test users; never point an app's prod binary at another app's Firebase |
 | Play Console ($25 once) | ✅ account fee is one-time | new app entry per Android app + its own signing/upload key flow |
 | Sonar (localhost:9000) | ✅ reuse server | new project keys; run `local-gate.sh <new-key>` |
@@ -122,6 +123,10 @@ The core question of this guide. Same computer, same accounts:
       ```bash
       ./scripts/set-secrets.sh dev --openai-api-key 'sk-or-v1-…' --actuator-password '<strong>'
       ```
+- [ ] **Optional — billing** (only if this product sells a subscription): follow the activation
+      runbook [`integrations/STRIPE.md`](../integrations/STRIPE.md) — Stripe product/price +
+      webhook endpoint, two new Secret Manager secrets, four `--set-env-vars` additions. The
+      extension stays `503 BILLING_DISABLED` until `BILLING_ENABLED=true`.
 - [ ] Trigger **Deploy to DEV** → chain green (`verify → build-and-push → deploy-dev → smoke-dev`),
       `/health/*` 200, unauth `/api/v1/me` 401. Copy the DEV URL — the mobile repo needs it.
 - [ ] PROD mirror: `prod.tfvars` → plan/apply prod → `_PROD` secrets → **two** cross-project

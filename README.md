@@ -33,6 +33,7 @@ This repository is intentionally reduced to an index:
 
 ## Where to go next
 
+- **Integrations that need activation wiring** (Stripe subscriptions on Spring): [`integrations/STRIPE.md`](./integrations/STRIPE.md).
 - Open `starter-backend` and `starter-mobile` as their own checkouts. Each README lists the **repository settings to enable after first push** (branch protection, Dependabot, secret scanning, environments).
 - Phase 1 (this extraction) is complete. The next coordination step is Phase 2 of the roadmap: version the HTTP contract and harden fail-closed configuration.
 - Eventually this workspace can be retired once both templates are published to GitHub and products are created from tagged releases.
