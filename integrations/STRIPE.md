@@ -1,6 +1,9 @@
 # STRIPE.md — Stripe Subscription Billing Integration
 
-**Status: implemented in the templates (2026-08-24), opt-in at runtime.** This runbook is the
+**Status: implemented in the templates (2026-08-24), opt-in at runtime. Template's own
+integration fully wired + E2E-verified in DEV and PROD — Stripe TEST mode (2026-08-29);
+live mode pending.** Ticks below record the template's own integration; start a new app
+with blank boxes. This runbook is the
 activation checklist for **one Stripe subscription price per environment** on the Spring Boot
 backend (`starter-backend`), consumed by the Expo client (`starter-mobile`) through the pinned
 OpenAPI contract. Follow it top-to-bottom per environment; DEV in test mode first, PROD second.
@@ -43,12 +46,12 @@ envelope.
 
 ### 1. Stripe console (test mode first)
 
-- [ ] Log in and switch to **TEST mode** (toggle bottom-left):
+- [x] Log in and switch to **TEST mode** (toggle bottom-left):
       Stripe dashboard — <https://dashboard.stripe.com> / test view <https://dashboard.stripe.com/test>.
-- [ ] Create the subscription product in **TEST mode**:
+- [x] Create the subscription product in **TEST mode** (starter: DEV `price_1U9RPhBX76CeluqMtOURLc9T`, PROD `price_1U9iShBX76CeluqMnna2gBlb`):
       [Dashboard → Product catalog → Add product](https://dashboard.stripe.com/test/products)
       → Recurring price (e.g. monthly). Copy the **price id** (`price_...`).
-- [ ] Create the webhook endpoint:
+- [x] Create the webhook endpoint (starter: DEV + PROD endpoints, the PROD one 2026-08-29):
       [Dashboard → Developers → Webhooks → Add endpoint](https://dashboard.stripe.com/test/webhooks) →
       **Endpoint URL** = `https://<app>-api-<env>.run.app/api/v1/billing/webhook` — select
       exactly: `checkout.session.completed`, `customer.subscription.created`,
@@ -70,7 +73,7 @@ Template pattern from STEP6: `https://myapp-api-dev-<hash>-…run.app/api/v1/bil
   `guides/STEP6_NEW_APP_FROM_STARTER.md` §4b *after* the backend deploy, from the same deploy
   output. Until then there is nothing to find; the deploy output line and
   `curl https://<url>/health/ready` are the source of truth.
-- [ ] Note the **secret key** ([API keys page](https://dashboard.stripe.com/test/apikeys)):
+- [x] Note the **secret key** ([API keys page](https://dashboard.stripe.com/test/apikeys)):
       `sk_test_...` for DEV, `sk_live_...` only for PROD (live keys from
       <https://dashboard.stripe.com/apikeys>).
 
@@ -86,14 +89,14 @@ and [`promote-prod.yml`](../starter-backend/.github/workflows/promote-prod.yml) 
 **conditional "Configure billing extension" step** that is skipped unless the matching repo
 variable is `true`. You only provide the values.
 
-- [ ] Secrets → Secret Manager. [`infra/scripts/set-secrets.sh`](../starter-backend/infra/scripts/set-secrets.sh)
+- [x] Secrets → Secret Manager (starter: dev + prod done). [`infra/scripts/set-secrets.sh`](../starter-backend/infra/scripts/set-secrets.sh)
       already supports the two Stripe flags:
       ```bash
       cd infra && ./scripts/set-secrets.sh dev \
         --stripe-secret-key 'sk_test_…' \
         --stripe-webhook-secret 'whsec_…'
       ```
-- [ ] Non-secret values → GitHub Actions **repository variables** on the backend repo
+- [x] Non-secret values → GitHub Actions **repository variables** on the backend repo (starter: both envs)
       (Settings → Secrets and variables → Actions → Variables; or `gh variable set`).
       DEV names (PROD uses the `_PROD` suffix, e.g. `BILLING_ENABLED_PROD`):
       ```bash
@@ -108,20 +111,20 @@ variable is `true`. You only provide the values.
       ```
       ⚠️ enabling without `STRIPE_PRICE_ID_*` / `*_URL_*` set makes the step **fail loudly**
       (deploy fails closed) — that is intentional.
-- [ ] Push/merge → deploy runs; the billing step flips the Cloud Run env vars + secrets.
+- [x] Push/merge → deploy runs; the billing step flips the Cloud Run env vars + secrets (via `--update-*`, never `--set-*`).
 - [ ] (Optional, template-only) local-run defaults if you want the app to answer 503 cleanly
       without a Stripe account — already the default; nothing to do.
 
 ### 3. Deploy & verify (DEV, test mode)
 
-- [ ] Local gate stays green: `./mvnw verify` then `docker build -t starter-backend:local .`
+- [x] Local gate stays green: `./mvnw verify` then `docker build -t starter-backend:local .`
       (run from `starter-backend/`).
-- [ ] Deploy; smoke:
+- [x] Deploy; smoke:
       ```bash
       curl -s -o /dev/null -w '%{http_code}\n' https://<app>-api-dev.run.app/api/v1/billing/me
       # 401 without token; with a DEV Firebase token: 200 {"status":"none",…}
       ```
-- [ ] **Automated E2E runs in CI** — `deploy-dev.yml` smoke job executes
+- [x] **Automated E2E runs in CI** — `deploy-dev.yml` smoke job executes
       [`scripts/billing-e2e.sh`](../starter-backend/scripts/billing-e2e.sh) whenever
       `BILLING_ENABLED_DEV=true` (Stripe test mode; keys pulled from Secret Manager). It proves
       the full server-side chain: anonymous sign-in → `billing/me` `none` → hosted Checkout URL →
@@ -140,7 +143,7 @@ variable is `true`. You only provide the values.
 
 ### 4. Local development (no Stripe account needed)
 
-- [ ] `local` profile serves `MockBillingAdapter` (no network, no secrets; webhook parsing skips
+- [x] `local` profile serves `MockBillingAdapter` (no network, no secrets; webhook parsing skips
       signature checks **by design — never run `local` outside a dev machine**).
 - [ ] Against real DEV, forward test-mode webhooks:
       ```bash
@@ -194,18 +197,18 @@ table is an **extra** marketing/signup surface on the web export.
       ```
       Set them in the EAS/web build env (e.g. `--set-env-vars` for the
       static-export step) or locally before `npx expo export`.
-- [ ] The webhook path already handles these checkouts: pricing-table sessions
+- [x] The webhook path already handles these checkouts: pricing-table sessions
       carry `client_reference_id` (the signed-in user's uid, set by
       [`app/pricing.tsx`](<../starter-mobile/app/pricing.tsx>)), and the adapter
       prefers that session hint when resolving the owning user.
-- [ ] The Billing tab links to `/pricing` on web only; native builds keep the
+- [x] The Billing tab links to `/pricing` on web only; native builds keep the
       backend-created hosted Checkout and render nothing extra.
 
 ### 7. Mobile (`<app>-mobile`)
 
 Nothing to configure on native — the app is contract-driven.
 
-- [ ] Only keep the pinned contract in sync after a backend contract change:
+- [x] Only keep the pinned contract in sync after a backend contract change:
       ```bash
       npm run validate:contract   # passes when types match contract/openapi.yaml
       ```
