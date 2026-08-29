@@ -43,7 +43,7 @@ Exit: cross-repository integration is explicit and missing production configurat
 - [x] Upgrade Spring Boot, Spring AI, Firebase Admin, and Google Cloud libraries to a supported baseline — Spring Boot 4.1.0, Spring AI 2.0.0 (`spring-ai-starter-model-openai`), spring-cloud-gcp 8.1.0, Firebase Admin 9.10.0, libraries-bom 26.86.0; milestone repo removed; Boot 4 migration completed (Jackson 3 `tools.jackson`, `@MockitoBean`, `spring-boot-starter-webmvc-test`)
 - [x] Add AI timeout, rate limit, quota/budget, and safe telemetry — per-user sliding-window quota (`AI_MAX_REQUESTS_PER_USER`, `AI_RATE_LIMIT_WINDOW`) → `429 RATE_LIMITED` + `Retry-After`; input cap (`AI_MAX_INPUT_CHARS`) → `400 INPUT_LIMIT_EXCEEDED`; provider timeout (`AI_REQUEST_TIMEOUT`) → `502`; metrics `starter.ai.*` (outcome only, no prompts/PII); strict env placeholders in cloud profiles, guard-railed by `ConfigFailClosedTest`
 - [x] Make the AI endpoint explicitly stateless; defer conversation memory — `sessionId` removed from the v1 contract (no tags released yet), `AiChatPort.complete(message)` has no session concept; contract and mobile client updated
-- [x] Add integration tests for auth, errors, Firestore, and the OpenAPI contract — 40 tests green incl. rate-limit (429+Retry-After), input-cap, provider-timeout, auth-envelope, and a real Firestore emulator round trip (Testcontainers; opt-in `RUN_FIRESTORE_EMULATOR_TEST=true`, run in CI)
+- [x] Add integration tests for auth, errors, Firestore, and the OpenAPI contract — 40 tests green incl. rate-limit (429+Retry-After), input-cap, provider-timeout, auth-envelope, and a real Firestore emulator round trip (Testcontainers; opt-in `RUN_FIRESTORE_EMULATOR_TEST=true`, run in CI). Suite grown to 126 tests by 2026-08-29 (emulator guard, Basic scoping, billing/email) — see the caveat register.
 - [x] Add container scanning, SBOM/provenance, and digest capture — CycloneDX SBOM at `target/bom.json` (artifact in CI, baked into the image), non-root container image with OCI labels, Trivy CRITICAL/HIGH gate in deploy-DEV (and on promoted images in PROD), immutable `image@sha256` digest captured and uploaded by deploy-DEV; PROD workflow accepts the digest for promotion (enforcement of digest-only is Phase 5)
 - [x] Add repeatable infrastructure code for DEV and PROD — `infra/` Terraform (APIs, Firestore native, Artifact Registry, Secret Manager, least-privilege runtime SA, GitHub WIF pool/provider, deployment roles), per-env tfvars, plan/apply/set-secrets scripts, `terraform validate` PR check
 
@@ -51,7 +51,7 @@ Exit: a tagged backend candidate can be reproduced and safely deployed.
 
 ## Phase 4 — mobile foundation hardening
 
-- [x] Reinstall dependencies from a clean lockfile state and make lint deterministic (`npm ci` + `.nvmrc` Node 22 + direct ESLint in CI; 32 Jest tests green from clean install)
+- [x] Reinstall dependencies from a clean lockfile state and make lint deterministic (`npm ci` + `.nvmrc` Node 22 + direct ESLint in CI; 32 Jest tests green from clean install; 105 tests by 2026-08-29 — see the caveat register)
 - [x] Add unit/component tests for auth gating, API retry, and environment validation
 - [x] Add generated or contract-checked API types (`validate-contract.mjs` now checks `src/api/types.ts` surface vs the pinned OpenAPI)
 - [x] Add Firebase Auth persistence appropriate to React Native (AsyncStorage-backed via the SDK's RN entry)

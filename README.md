@@ -2,10 +2,10 @@
 
 Coordination workspace for two **independent**, reusable template repositories, extracted into standalone Git repositories during Phase 1. Each child directory is now its own repository and is no longer tracked by this workspace.
 
-| Repository | Content | Branch |
+| Repository | Remote | Content |
 |---|---|---|
-| [`starter-backend`](./starter-backend/) | Spring Boot API template | `main` |
-| [`starter-mobile`](./starter-mobile/) | Expo / React Native client template | `main` |
+| [`starter-backend`](./starter-backend/) | `patrikbego/starter-backend` | Spring Boot API template |
+| [`starter-mobile`](./starter-mobile/) | `patrikbego/starter-mobile` | Expo / React Native client template |
 
 The two repositories have independent histories, CI workflows, and (after first push) protection, secrets, and environments. They integrate only through a versioned HTTP contract; neither reaches into the other's source tree.
 
@@ -34,7 +34,7 @@ This repository is intentionally reduced to an index:
 
 ## Where to go next
 
-- **Integrations**: one runbook per external service in [`integrations/README.md`](./integrations/README.md) — Stripe billing (implemented), Resend email (specced), Firebase Auth, OpenRouter AI, Slack alerts, browser E2E.
+- **Integrations**: one runbook per external service in [`integrations/README.md`](./integrations/README.md) — Firebase Auth, OpenRouter AI, Stripe billing and Resend email (both implemented, opt-in), Slack alerts, browser E2E.
 - Open `starter-backend` and `starter-mobile` as their own checkouts. Each README lists the **repository settings to enable after first push** (branch protection, Dependabot, secret scanning, environments).
-- Phase 1 (this extraction) is complete. The next coordination step is Phase 2 of the roadmap: version the HTTP contract and harden fail-closed configuration.
+- Roadmap Phases 1–4 are complete: contract v1 is backend-owned with a digest-pinned mobile copy, profiles fail closed, and AI guardrails are in. The remaining v1 exit criteria are the unchecked items in each repo's scope checklist: tags/releases, live infra apply, EAS/store delivery.
 - Eventually this workspace can be retired once both templates are published to GitHub and products are created from tagged releases.
