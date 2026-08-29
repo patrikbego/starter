@@ -26,18 +26,33 @@ Use this process after the backend and mobile templates have independent reposit
 
 ## 1. Create two product repositories
 
-Create from tagged template releases or GitHub template repositories:
+Derive each product by cloning the template **with git history** so starter improvements can
+later flow in as a normal `git merge upstream/main` (see [Upstream sync](./UPSTREAM_SYNC.md)).
+Do not use *Use this template* — it strips history and breaks merge-based propagation.
 
 ```text
-myvault-backend   <- starter-backend release vX.Y.Z
-myvault-mobile    <- starter-mobile release vA.B.C
+myvault-backend   <- starter-backend release vX.Y.Z (clone, history preserved)
+myvault-mobile    <- starter-mobile release vA.B.C  (clone, history preserved)
 ```
+
+```bash
+gh repo create patrikbego/myvault-backend --private
+git clone git@github.com:patrikbego/starter-backend.git myvault-backend
+cd myvault-backend
+git remote rename origin upstream
+git remote add origin git@github.com:patrikbego/myvault-backend.git
+git checkout -B main vX.Y.Z
+git push -u origin main
+```
+
+Repeat for `myvault-mobile` from `starter-mobile` at tag `vA.B.C`. `origin` is the product
+repository; `upstream` is the template repository and stays read-only.
 
 In each product README, record:
 
 ```text
-Created from starter-backend vX.Y.Z
-Created from starter-mobile vA.B.C
+Created from starter-backend vX.Y.Z (commit <sha>) — upstream = patrikbego/starter-backend
+Created from starter-mobile vA.B.C (commit <sha>) — upstream = patrikbego/starter-mobile
 Supported API contract: v1
 ```
 
@@ -95,7 +110,7 @@ In the backend GitHub repository:
 
 1. Add DEV and protected PROD environments.
 2. Configure OIDC/WIF identities; do not upload service-account JSON keys.
-3. Set non-secret environment variables for project, region, service, and registry.
+3. Set the non-secret app identity as **repo variables** (`PROJECT_ID_DEV`, `PROJECT_ID_PROD`, `ARTIFACT_REPOSITORY`, `IMAGE_NAME`; optional `REGION`, `CORS_ALLOWED_ORIGINS_PROD`) — the template deploy workflows read `vars.*`; never edit the workflow files.
 4. Store runtime provider keys and admin credentials in Secret Manager.
 5. Require CI before merge and before deployment.
 6. Configure production approval and prevent self-approval where the GitHub plan supports it.
@@ -176,6 +191,7 @@ Record at minimum:
 ## Related documents
 
 - [Repository strategy](./REPOSITORY_STRATEGY.md)
+- [Upstream sync](./UPSTREAM_SYNC.md) — how starter improvements flow into this app later
 - [Environment matrix](./ENVIRONMENT_MATRIX.md)
 - [Implementation roadmap](./IMPLEMENTATION_ROADMAP.md)
 - [Project review](./REVIEW_FINDINGS.md)

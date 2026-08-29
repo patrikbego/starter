@@ -14,17 +14,24 @@ setup is `com.starter.*`; keep it unless you deliberately re-brand.
 ## 0. How derivation works
 
 ```text
-patrikbego/starter-backend ──"Use this template"──▶ patrikbego/<app>-backend   (new repo, fresh history)
-patrikbego/starter-mobile  ──"Use this template"──▶ patrikbego/<app>-mobile    (new repo, fresh history)
+patrikbego/starter-backend ──clone (history preserved)──▶ patrikbego/<app>-backend
+patrikbego/starter-mobile  ──clone (history preserved)──▶ patrikbego/<app>-mobile
 
 <app>-backend ── owns openapi/openapi.yaml (contract v1) ──▶ pinned by <app>-mobile via
               validate:contract      ◀── the ONLY integration boundary between the repos
 ```
 
-- Both templates are already flagged **Template repository** (Step 5 §1/§5) — *Use this template*
-  copies the code **without commit history**, which is what you want for a product.
+- App repos are created by **cloning the template with full git history** (§3a/§4a) — NOT
+  *Use this template*, which strips history and turns every future template improvement into
+  an unrelated-histories merge. Preserved history is what makes starter integrations flow
+  into this app as a normal `git merge upstream/main` — policy and runbook:
+  [`docs/UPSTREAM_SYNC.md`](../docs/UPSTREAM_SYNC.md).
+- Remotes per app repo: `origin` = the app repo (you push here); `upstream` = the template
+  repo (read-only reference; never push to it).
+- The template repos stay flagged **Template repository** (Step 5 §1/§5); the flag is now
+  optional convenience, not the documented path.
 - The repos stay independent; they meet only at the versioned API contract.
-- CI/workflows come along with the copy — most renames below are about making them target the
+- CI/workflows come along with the clone — most renames below are about making them target the
   NEW app's cloud resources instead of the template's.
 
 ## 1. Decide every identifier ONCE (fill this in before touching anything)
@@ -50,19 +57,19 @@ The core question of this guide. Same computer, same accounts:
 
 | Credential / resource | Reuse? | Per-app action |
 |---|---|---|
-| GitHub account (`patrikbego`) | ✅ reuse | just create the 2 new repos via *Use this template* |
+| GitHub account (`patrikbego`) | ✅ reuse | create the 2 new repos with `gh repo create`, then derive by cloning (§3a/§4a) |
 | Expo account (`@p4trik`) | ✅ reuse | **new EAS project per app** (`eas init`) |
 | `EXPO_TOKEN` value | ✅ same value works for all apps | set as secret in EACH new mobile repo |
 | Apple Developer Program ($99/yr) | ✅ membership reused | distribution cert is team-level → reusable; **App IDs/profiles are per bundle id** → minted fresh per app; **ascAppId exists only after you register THIS app in App Store Connect** |
 | Google Cloud account + billing | ✅ reuse billing account | **new GCP projects per app, per env** (dev+prod); never share projects between products |
-| Terraform state bucket | ⚠️ **NOT as-is** | `scripts/plan.sh` hard-codes `prefix=starter-${ENV}` — reusing `gs://starter-tfstate` would collide with the original project's state. Either create `gs://<brand>-tfstate-<app>` (zero code change) or parameterize the prefix first |
-| OpenRouter account | ✅ reuse | **create a new API key per app** — per-app spend tracking; feed it to that app's Secret Manager only |
+| Terraform state bucket | ⚠️ **NOT as-is** | never reuse the template's `gs://starter-tfstate` — state collisions. Create `gs://starter-tfstate-<app>` AND pass `TFSTATE_PREFIX=<app>` (both supported: `plan.sh` reads `TFSTATE_PREFIX`, default `starter`) |
+| OpenRouter account | ✅ reuse | **create a new API key per app** — per-app spend tracking; feed it to that app's Secret Manager only. Key click-path + traps: [`integrations/OPENROUTER_AI.md`](../integrations/OPENROUTER_AI.md) |
 | Stripe account (optional billing) | ✅ reuse account | **per app/env**: new product + price, new webhook endpoint, new API key + signing secret (test mode first, live for PROD). Full runbook: [`integrations/STRIPE.md`](../integrations/STRIPE.md) |
-| Firebase | ❌ new | new project per app (DEV + PROD), new Web-app registration per project, new test users; never point an app's prod binary at another app's Firebase |
+| Firebase | ❌ new | new project per app (DEV + PROD), new Web-app registration per project, new test users; never point an app's prod binary at another app's Firebase. Runbook: [`integrations/FIREBASE_AUTH.md`](../integrations/FIREBASE_AUTH.md) |
 | Play Console ($25 once) | ✅ account fee is one-time | new app entry per Android app + its own signing/upload key flow |
 | Sonar (localhost:9000) | ✅ reuse server | new project keys; run `local-gate.sh <new-key>` |
-| `FIREBASE_WEB_API_KEY` + `FIREBASE_TEST_USER_EMAIL/_PASSWORD` (optional auth smoke, future E2E) | ❌ new values | from THIS app's DEV Firebase project; same secret names as the template |
-| `SLACK_WEBHOOK` (optional deploy-failure alerts) | ❌ new if used | per-repo secret; a shared webhook would misroute alerts between apps |
+| `FIREBASE_WEB_API_KEY` + `FIREBASE_TEST_USER_EMAIL/_PASSWORD` (optional auth smoke, future E2E) | ❌ new values | from THIS app's DEV Firebase project; same secret names as the template. Click-paths: [`integrations/FIREBASE_AUTH.md`](../integrations/FIREBASE_AUTH.md) |
+| `SLACK_WEBHOOK` (optional deploy-failure alerts) | ❌ new if used | per-repo secret; a shared webhook would misroute alerts between apps. Click-path: [`integrations/SLACK_ALERTS.md`](../integrations/SLACK_ALERTS.md) |
 | `gh` CLI auth | ✅ reuse | — |
 | `gcloud` / ADC | ✅ reuse | `gcloud config set project <new-dev-project>` before terraform runs |
 | eas-cli pin (`>=16 <17`) | ✅ same pin | revisit only on an SDK bump (see Step 5 §5 trap) |
@@ -73,12 +80,21 @@ The core question of this guide. Same computer, same accounts:
 
 ### 3a. Create + rename
 
-- [ ] *Use this template* → `patrikbego/myapp-backend` (private).
+- [ ] Create the empty repo, then derive from the template **with history** (§0):
+      ```bash
+      gh repo create patrikbego/myapp-backend --private
+      git clone git@github.com:patrikbego/starter-backend.git myapp-backend
+      cd myapp-backend
+      git remote rename origin upstream
+      git remote add origin git@github.com:patrikbego/myapp-backend.git
+      git checkout -B main vX.Y.Z        # latest template release tag; none yet → keep main tip, record the SHA
+      git push -u origin main
       ```
-      github.com/patrikbego/starter-backend → green "Use this template" button
-      → Repository name myapp-backend → Private ✓ → Create
-      ```
-- [ ] Clone locally next to the other repos: `~/develop/starter/<app>-backend`.
+      ⚠️ Never `git push --tags` in an app repo — the clone brings the template's tags along;
+      they stay local references. Never push to `upstream`.
+- [ ] Record in the README: `Created from starter-backend vX.Y.Z (commit <sha>)` and
+      `upstream = patrikbego/starter-backend`. Future starter improvements reach this repo via
+      [`docs/UPSTREAM_SYNC.md`](../docs/UPSTREAM_SYNC.md) §4.
 - [ ] Rename identifiers — full inventory (grep confirms nothing else):
       ```bash
       cd myapp-backend && grep -rn "starter" --include="*.yml" --include="*.tfvars" --include="*.sh" --include="*.md" \
@@ -87,11 +103,19 @@ The core question of this guide. Same computer, same accounts:
       | File | Change |
       |---|---|
       | `infra/dev.tfvars` + `infra/prod.tfvars` | `app` → `myapp`, `project_id` → your new unique IDs, `artifact_repository_id` → e.g. `myapp-api`, `github_organization` stays `patrikbego`, `github_repository` → `myapp-backend`. ⚠️ `REPLACE_ME_ORG` breaks WIF silently — exact-repo match (Step 5 §2) |
-      | `.github/workflows/deploy-dev.yml` | env block (~line 31): `PROJECT_ID` → new DEV id, `IMAGE_NAME` → `myapp-api`, `SERVICE_NAME` → `myapp-api-dev`, and **`ARTIFACT_REPOSITORY` → must equal `artifact_repository_id` in tfvars** (push targets `<region>-docker.pkg.dev/<project>/<ARTIFACT_REPOSITORY>/<IMAGE_NAME>`); CORS origins in `--set-env-vars` stay as-is (localhost ports unchanged); line 160's `--service-account starter-api@…` → `myapp-api@…` (the WIF-authed steps use secrets — nothing else is name-bound) |
-      | `.github/workflows/promote-prod.yml` | same five env values for PROD + its own `--service-account`; the example digest at ~line 18 still shows the old `starter-demo-dev/starter/starter-api` path — cosmetic, update to avoid confusion |
+      | `.github/workflows/deploy-dev.yml` + `promote-prod.yml` | **no file edits** — both read repo variables (`PROJECT_ID_DEV`/`PROJECT_ID_PROD`, `ARTIFACT_REPOSITORY`, `IMAGE_NAME`; optional `REGION`, `CORS_ALLOWED_ORIGINS_PROD`). Set them once with `gh variable set` (block below). ⚠️ `IMAGE_NAME` must equal `artifact_repository_id` in tfvars — the runtime service account becomes `<IMAGE_NAME>@<PROJECT_ID>.iam…` and the services `<IMAGE_NAME>-dev`/`-prod`. Missing variables fail the deploy at a "Fail fast" step naming the variable |
       | `scripts/local-gate.sh` usage | pass the new key at run time: `./scripts/local-gate.sh myapp-backend` (no file edit needed) |
       | docs + `openapi.yaml` info block | cosmetic — mentions of `starter` in README/docs and the API title/version string; update at will, nothing name-bound |
-      | optional template improvement | make `plan.sh`'s `prefix=starter-${ENV}` read `TFSTATE_PREFIX` (then use `myapp-${ENV}`) — otherwise rely on the per-app bucket from §2 |
+      | state-bucket prefix | done in the template — `plan.sh` reads `TFSTATE_PREFIX` (default `starter`); run `TFSTATE_BUCKET=<app>-tfstate TFSTATE_PREFIX=myapp ./scripts/plan.sh dev` so app state never collides with the template's |
+- [ ] Set the deploy repo variables (the workflows read `${{ vars.* }}`; no workflow edits, ever):
+      ```bash
+      gh variable set PROJECT_ID_DEV      -R patrikbego/myapp-backend --body starter-demo-myapp-dev
+      gh variable set ARTIFACT_REPOSITORY -R patrikbego/myapp-backend --body myapp-api
+      gh variable set IMAGE_NAME          -R patrikbego/myapp-backend --body myapp-api
+      gh variable set PROJECT_ID_PROD     -R patrikbego/myapp-backend --body starter-demo-myapp-prod  # once §3b created it
+      gh variable set CORS_ALLOWED_ORIGINS_PROD -R patrikbego/myapp-backend --body https://app.myapp.com  # browser clients hitting PROD
+      ```
+      `REGION` defaults to `europe-west2`; set the variable only to override.
 - [ ] Local gate green: `./scripts/local-gate.sh myapp-backend` (Sonar shows up under the new
       key automatically once scanned).
 
@@ -108,7 +132,7 @@ The core question of this guide. Same computer, same accounts:
 - [ ] State bucket: `gcloud storage buckets create gs://starter-tfstate-myapp --location=europe-west2`
 - [ ] Auth: `gcloud auth application-default login` (skip if ADC still valid) +
       `gcloud config set project starter-demo-myapp-dev`.
-- [ ] `cd infra && TFSTATE_BUCKET=starter-tfstate-myapp ./scripts/plan.sh dev` → review →
+- [ ] `cd infra && TFSTATE_BUCKET=starter-tfstate-myapp TFSTATE_PREFIX=myapp ./scripts/plan.sh dev` → review →
       `./scripts/apply.sh dev`.
       ⚠️ brand-new project: AR repo + WIF pool creates can 403 on API-enable propagation —
       re-run plan+apply; second pass adds only stragglers (hit live 2026-08-22).
@@ -119,7 +143,8 @@ The core question of this guide. Same computer, same accounts:
       gh secret set GCP_SERVICE_ACCOUNT_DEV -R patrikbego/myapp-backend \
         --body "$(terraform output -raw deployer_service_account)"
       ```
-- [ ] Runtime secrets (NEW OpenRouter key for this app):
+- [ ] Runtime secrets (NEW OpenRouter key for this app — per-app key rule + 401 trap:
+      [`integrations/OPENROUTER_AI.md`](../integrations/OPENROUTER_AI.md)):
       ```bash
       ./scripts/set-secrets.sh dev --openai-api-key 'sk-or-v1-…' --actuator-password '<strong>'
       ```
@@ -138,7 +163,8 @@ The core question of this guide. Same computer, same accounts:
 
 ### 4a. Create + rename
 
-- [ ] *Use this template* → `patrikbego/myapp-mobile`; clone alongside.
+- [ ] Derive `patrikbego/myapp-mobile` exactly as §3a — `starter-mobile` → `myapp-mobile`,
+      record template tag + commit + `upstream` remote in the README.
 - [ ] `npm ci`; verify gates: `npm run lint && npx tsc --noEmit && npm test`.
 - [ ] Rename identifiers — inventory:
       ```bash
@@ -162,19 +188,14 @@ The core question of this guide. Same computer, same accounts:
       ```
       ⚠️ dynamic-config wrinkle again: capture the printed project id, put it in
       `extra.eas.projectId ?? '<id>'` fallback, and in `.env` (`EAS_PROJECT_ID=…`).
-- [ ] Firebase: do **NOT** create a separate `*-local-*` project for DEV. Instead **add Firebase
-      to the same GCP project the backend deploys to** (e.g. `myapp-dev`): console → Add project
-      → import existing GCP project → register **Web app** → Email/Password enabled. One project
-      per environment keeps the mobile token `aud` aligned with what the backend's Admin SDK
-      verifies.
-      ⚠️ Incident 2026-08-23: mobile DEV pointed at a `starter-local-b9525` Firebase project while
-      the backend lived in `starter-demo-dev` → every `/api/v1/me` returned 401 (audience
-      mismatch) even though sign-in itself worked. Caught only by the browser-E2E P0 spike.
-      Also: a fresh project's Auth config does not exist until someone opens **Authentication →
-      Get started** once in the console — there is no API to create it.
-      Put the new `EXPO_PUBLIC_FIREBASE_*` trio as repo **variables**
-      AND EAS `preview` environment vars (both places — runner env *and* cloud build env; Step 5 §5).
-      ⚠️ name projects to respect the env guards (`src/config/envValidation.ts:31`): a PROD
+- [ ] Firebase: add Firebase to the same GCP project the backend deploys to (`myapp-dev`), one
+      project per environment — never a separate `*-local-*` project. Full runbook (per-app
+      checklist, web-app click-path, console-only bootstrap, audience-mismatch incident):
+      [`integrations/FIREBASE_AUTH.md`](../integrations/FIREBASE_AUTH.md).
+      ⚠️ two non-negotiables stay inline:
+      (1) put the `EXPO_PUBLIC_FIREBASE_*` trio as repo **variables**
+      AND EAS `preview` environment vars (both places — runner env *and* cloud build env; Step 5 §5);
+      (2) name projects to respect the env guards (`src/config/envValidation.ts:31`): a PROD
       build fails if `EXPO_PUBLIC_FIREBASE_PROJECT_ID` matches `-dev([.-]|$)`; DEV/preview builds
       fail on `-prod` ids. Keep dev/prod Firebase ids unambiguous.
 - [ ] Repo variables: `API_BASE_URL_DEV=https://myapp-api-dev….run.app` (your new deploy!),
@@ -224,7 +245,7 @@ in EAS `production` env → ③ App Store Connect: accept agreement, register
 
 ## 7. Definition of done (first new app)
 
-- [ ] Both repos created via template, renamed, gates green (§3a/§4a tables complete)
+- [ ] Both repos derived with template history (§0), renamed, gates green (§3a/§4a tables complete)
 - [ ] Backend: DEV deployed + smoke green; PROD promoted (digest-only)
 - [ ] Mobile: EAS project linked; preview build green from CI; credentials minted for the new ids
 - [ ] Contract check passes against the NEW backend (`npm run validate:contract`)

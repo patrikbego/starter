@@ -38,7 +38,7 @@ This is a **starter**, not a one-off. We copy it to create many apps; CI/CD must
 
 | Question | Decision | Consequence |
 |---|---|---|
-| How apps are created | **GitHub template repositories** — `starter-backend` and `starter-mobile` are marked as templates; “Use this template” creates each app as its own fresh repo | The copied repo inherits working CI/CD; no manual re-wiring per app |
+| How apps are created | **Clone with history** — each app repo is created by cloning `starter-backend`/`starter-mobile` (origin = app, `upstream` = template); *Use this template* is not used (it strips history and breaks upstream merges) | The copied repo inherits working CI/CD; template improvements flow back in via `git merge upstream/main` (see `docs/UPSTREAM_SYNC.md`) |
 | Sonar | **One shared SonarQube server**; every app registers as its own project key on the same instance | Run analysis locally in Docker before push (Step 5); CI Sonar is a deferred, per-app follow-up — no per-app server to host |
 | Delivery model | **Each app repo is self-contained** — backend deploy + Sonar + smoke live inside the app's own repo | Scales by copying; no cross-repo orchestration to maintain |
 | Local gate | **Standard** — lint + typecheck + tests + Sonar + container build run locally in Docker before push | CI mainly re-confirms; deploy/smoke is the only new work in CI |
@@ -86,7 +86,7 @@ Because apps are created by copying the template, do this once, up front, so eve
 
 ### C3. Verify the create-an-app loop with a disposable trial app
 
-- [ ] Use “Use this template” to create a throwaway app from `starter-backend` and `starter-mobile`.
+- [ ] Derive a throwaway app from `starter-backend` and `starter-mobile` by cloning with history (`docs/UPSTREAM_SYNC.md` §5).
 - [ ] Rename the per-app identifiers, run the local Docker gate, push, and confirm CI + shared-Sonar + DEV deploy work in the copied repo.
 - [ ] Record setup time and every manual exception; fix the template until the process is repeatable (this is the Phase 6 trial, run once to validate the scaffolding now).
 

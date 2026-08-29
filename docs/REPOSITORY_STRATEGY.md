@@ -56,8 +56,8 @@ Neither repository contains relative links that require a sibling checkout. Cros
 2. Tag stable template releases using semantic versions.
 3. Publish release notes with breaking changes and a short migration guide.
 4. Maintain a compatibility table in the mobile repository, for example `mobile-template v1.x -> backend contract v1`.
-5. Create products from a known backend tag and a known mobile tag, recording both in the product docs.
-6. Treat created products as independent. Pull template improvements explicitly; never auto-merge upstream changes into product repositories.
+5. Create products from a known backend tag and a known mobile tag, recording both in the product docs. Derive by cloning the template with history (see [Upstream sync](./UPSTREAM_SYNC.md)) — never *Use this template*, which strips history and breaks merge-based propagation.
+6. Treat created products as independent. Pull template improvements explicitly; never auto-merge upstream changes into product repositories. The explicit mechanism is `git fetch upstream && git merge upstream/main` per product repo — runbook in [Upstream sync](./UPSTREAM_SYNC.md).
 
 ## Contract ownership
 

@@ -86,7 +86,7 @@ Documented here and in the repo docs (`AI_INTEGRATION.md`, `infra/README.md`, `E
 |---|---|
 | No default profile; fail-closed config | [`application.yml`](../starter-backend/src/main/resources/application.yml) + [`ConfigFailClosedTest.java`](../starter-backend/src/test/java/com/starter/ConfigFailClosedTest.java) |
 | DEV deploy builds with tests skipped and is independent of CI | [`deploy-dev.yml`](../starter-backend/.github/workflows/deploy-dev.yml) |
-| PROD digest promotion + legacy rebuild path | [`deploy-prod.yml`](../starter-backend/.github/workflows/deploy-prod.yml) |
+| PROD digest promotion (workflow renamed from `deploy-prod.yml`; legacy rebuild path since removed) | [`promote-prod.yml`](../starter-backend/.github/workflows/promote-prod.yml) |
 | AI adapter is stateless | [`SpringAiOpenRouterAdapter.java`](../starter-backend/src/main/java/com/starter/adapters/ai/SpringAiOpenRouterAdapter.java) |
 | AI quota/input/timeout enforcement | [`AiRequestGuard.java`](../starter-backend/src/main/java/com/starter/application/AiRequestGuard.java), [`AiGuardConfig.java`](../starter-backend/src/main/java/com/starter/config/AiGuardConfig.java) and tests |
 | User email is logged | [`UserService.java`](../starter-backend/src/main/java/com/starter/application/UserService.java#L25) |

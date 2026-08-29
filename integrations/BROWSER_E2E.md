@@ -3,7 +3,7 @@
 **Status: P0–P4 implemented 2026-08-23.** Playwright suite green locally and in CI
 (`web-e2e` PR gate 2m42s + `web-e2e-ai` dispatch job, both success); AI spec dispatch-only.
 Work top-to-bottom; decisions below are resolved.
-Companion to [`STEP5_FIRST_PUSH_CHECKLIST.md`](./STEP5_FIRST_PUSH_CHECKLIST.md) (§5 CI path is
+Companion to [`STEP5_FIRST_PUSH_CHECKLIST.md`](../guides/STEP5_FIRST_PUSH_CHECKLIST.md) (§5 CI path is
 green; this adds the automated-E2E layer on top of it).
 
 ## Goal

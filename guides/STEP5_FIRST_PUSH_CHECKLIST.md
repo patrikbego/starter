@@ -150,36 +150,19 @@ Backend and mobile promote independently; they meet only at the versioned API co
   targets the wrong project when your project id isn't literally `starter-dev`*
   <details><summary><strong>Where to get the OpenAI-compatible API key (OpenRouter)</strong> (click-path)</summary>
 
-  The backend calls an OpenAI-compatible `/v1/chat/completions` endpoint. The template is wired
-  for an OpenRouter key (prefix `sk-or-v1-`), which needs its own (free) account:
-  ```
-  1. Sign up at [openrouter.ai](https://openrouter.ai).
-  2. Keys → Create API key -> copy the `sk-or-v1-…` string (shown once).
-  3. Add a small credit balance if needed (Chat Completions cost fractions of a cent per call).
-  ```
-  Pass it with `--openai-api-key` in `set-secrets.sh dev` and again for PROD. 
-  *⚠️ The 2026-08-22 run captured a truncated key (`sk-or-v1-cae7…`); if `/api/v1/ai/chat` returns
-  401, re-run `set-secrets.sh dev` with the full key.*
+  Full click-path, per-app key rule, Secret Manager wiring, and the truncated-key 401 trap:
+  **[`integrations/OPENROUTER_AI.md`](../integrations/OPENROUTER_AI.md)**. Pass the key with
+  `--openai-api-key` in `set-secrets.sh dev` and again for PROD.
   </details>
 
 - [ ] **Optional** DEV secrets for the authenticated smoke: `FIREBASE_WEB_API_KEY`,
       `FIREBASE_TEST_USER_EMAIL`, `FIREBASE_TEST_USER_PASSWORD` (GitHub).
   <details><summary><strong>Where to get each</strong> (click-path)</summary>
 
-  All three are GitHub repo secrets — *Settings → Secrets and variables → Actions → New
-  repository secret*. The smoke signs in via the Identity Toolkit REST API
-  (`accounts:signInWithPassword?key=<WEB_API_KEY>`), so it needs a **real Firebase user**, not a
-  service account.
-
-  1. `FIREBASE_WEB_API_KEY` — [console.firebase.google.com](https://console.firebase.google.com)
-     → select the DEV project (`starter-demo-dev`) → ⚙️ **Project settings → General → Your apps**.
-     No web app yet? Click the Web `</>` icon, register one (hosting off), then copy
-     `firebaseConfig.apiKey` (the long `AIzaSy…` string). Same key class the mobile app ships.
-  2. Email/password provider must be on first: **Build → Authentication → Sign-in method →
-     Email/Password → Enable**.
-  3. `FIREBASE_TEST_USER_EMAIL` / `FIREBASE_TEST_USER_PASSWORD` — **Authentication → Users →
-     Add user**, e.g. `smoke-test@starter-demo-dev.com` + a strong password. DEV-project-only;
-     this account exists purely so CI can prove an authorized `/api/v1/me` returns 200.
+  Web-app registration, Email/Password enable, and test-user creation click-paths live in
+  **[`integrations/FIREBASE_AUTH.md`](../integrations/FIREBASE_AUTH.md)** (§ Test users). All
+  three are GitHub repo secrets on the backend repo; the smoke signs in via the Identity
+  Toolkit REST API, so it needs a **real Firebase user**, not a service account.
   </details>
 
   > ✅ **2026-08-23:** DEV Firebase is provisioned — Firebase added to GCP project
@@ -190,18 +173,8 @@ Backend and mobile promote independently; they meet only at the versioned API co
 - [ ] **Optional** `SLACK_WEBHOOK` (GitHub secret) for the failure alert.
   <details><summary><strong>Create a Slack Incoming Webhook</strong> (click-path)</summary>
 
-  Needs a Slack workspace you can admin. Full click-path:
-  ```
-  1. Go to [api.slack.com/apps](https://api.slack.com/apps).
-  2. Create New App -> From scratch -> name it + pick a workspace -> Create App.
-  3. Incoming Webhooks (left) -> toggle Activate.
-  4. Add New Webhook to Workspace (below) -> pick a channel -> Allow.
-  5. Copy the `https://hooks.slack.com/services/T…/B…/…` URL into
-     `<backend repo> -> Settings -> Secrets and variables -> Actions -> New repository secret`,
-     named `SLACK_WEBHOOK`.
-  ```
-  *Without it, a deploy failure shows up only as a failing Actions run (the `notify` job still
-  succeeds silently).*
+  Full click-path, per-repo-secret rule (shared webhooks misroute alerts), and notify-job
+  behavior: **[`integrations/SLACK_ALERTS.md`](../integrations/SLACK_ALERTS.md)**.
   </details>
 - [x] **Trigger `Deploy to DEV`** (push to main or workflow_dispatch), confirm the chain
       `verify → build-and-push → deploy-dev → smoke-dev` green and `release-metadata.json` uploaded
@@ -313,16 +286,8 @@ Backend and mobile promote independently; they meet only at the versioned API co
       mobile PROD auth (needed by §5–§6 store builds, not by the backend smoke)* — recipe below.
   <details><summary><strong>Register a Firebase web app in PROD</strong> (click-path)</summary>
 
-  Same flow as the DEV one in §2, but in the **PROD** project (`starter-demo-prod`) and with
-  strictly separated values:
-  ```
-  1. console.firebase.google.com → open project `starter-demo-prod` → ⚙️ Project settings
-     → General → Your apps.
-  2. No Web app yet? Click the Web icon, register one (hosting off).
-  3. Copy `firebaseConfig.apiKey`, `authDomain`, `projectId` for the PROD mobile config.
-  4. Enable Email/Password at Build → Authentication → Sign-in method (if not already on).
-  5. Keep PROD values out of the DEV secrets set; the mobile PROD build gets its own bucket.
-  ```
+  Same flow as DEV but in the **PROD** project with strictly separated values — full
+  click-path: **[`integrations/FIREBASE_AUTH.md`](../integrations/FIREBASE_AUTH.md)**.
   </details>
 
 ## 4. Backend rollback drill
@@ -431,7 +396,7 @@ Backend and mobile promote independently; they meet only at the versioned API co
       dispatch-only job. First green runs: PR check **2m42s**
       ([32670865580](https://github.com/patrikbego/starter-mobile/actions/runs/32670865580))
       + dispatch success. Design and decisions:
-      [`BROWSER_E2E_INTEGRATION_PLAN.md`](./BROWSER_E2E_INTEGRATION_PLAN.md).
+      [`integrations/BROWSER_E2E.md`](../integrations/BROWSER_E2E.md).
   <details><summary><strong>Steps + settings paths</strong> (click-path)</summary>
 
   The preview build needs **four** things wired before it goes green. Each was a real failure on
@@ -604,10 +569,12 @@ Backend and mobile promote independently; they meet only at the versioned API co
 
 - [ ] Tick remaining Step 5 boxes in [`docs/IMPLEMENTATION_ROADMAP.md`](../docs/IMPLEMENTATION_ROADMAP.md)
       (A5 drills, B1 device loop) once proven.
-- [ ] First app via **“Use this template”** from both repos: rename per-app identifiers, run the
+- [ ] First app derived from both repos **by cloning with history** (not *Use this template* —
+      it strips history and breaks later upstream merges): rename per-app identifiers, run the
       local gate, push — this is Step 6 (v1.0.0 trial).
       **Full walkthrough: [`STEP6_NEW_APP_FROM_STARTER.md`](./STEP6_NEW_APP_FROM_STARTER.md)**
       (identifier planning, shared-vs-new credentials matrix, per-repo rename inventories).
+      Upstream propagation policy: [`docs/UPSTREAM_SYNC.md`](../docs/UPSTREAM_SYNC.md).
 
 ---
 
