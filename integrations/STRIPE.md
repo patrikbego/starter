@@ -147,9 +147,20 @@ variable is `true`. You only provide the values.
       stripe listen --forward-to localhost:8080/api/v1/billing/webhook
       ```
 
-### 5. PROD (test mode wired 2026-08-29; live mode on go-live)
+### 5. Environments vs Stripe modes — what "done" actually means
 
-- [x] **PROD wired in test mode**: terraform applied to `starter-demo-prod` (stripe secrets +
+The `dev`/`prod` split is **infrastructure only** (projects, promotion, webhook endpoints).
+"PROD" here is a production-*shaped* environment. Real production billing = Stripe **live
+mode** — none of the checks below involve real money:
+
+| Environment | Stripe test mode | Stripe live mode |
+|---|---|---|
+| `dev` (starter-demo-dev) | ✅ wired, E2E green | n/a — dev stays test |
+| `prod` (starter-demo-prod) | ✅ wired, E2E green — **still test mode** | ❌ go-live checklist below |
+
+### 5.1 PROD-shaped env, Stripe TEST mode (wired 2026-08-29)
+
+- [x] **Wired in test mode (no real money possible)**: terraform applied to `starter-demo-prod` (stripe secrets +
       Firebase Auth project config as code), `set-secrets.sh prod` with the test key + a **new
       PROD webhook endpoint** (own `whsec_…`, pointing at
       `starter-api-prod-599289271429.europe-west2.run.app`), new PROD product + price
@@ -161,7 +172,7 @@ variable is `true`. You only provide the values.
       (`1:599289271429:web:1b0b90cf12627925c5c5ec`, API key + authDomain provisioned), anonymous
       + email/password sign-in enabled via `google_identity_platform_config` in `infra/main.tf`.
       The mobile **PROD build** config uses these values (app.config.ts / EAS env).
-- [ ] **Live-mode go-live**: repeat §1 in live mode (new product/price/webhook endpoint,
+- [ ] **Real production = live mode** (the only step that touches real money): repeat §1 in live mode (new product/price/webhook endpoint,
       `sk_live_…`/`whsec_live_…`), re-run `set-secrets.sh prod`, update `STRIPE_PRICE_ID_PROD`.
       Everything else already works per environment.
 - [ ] Smoke with a real (small) payment before announcing; CD/rollback rules unchanged
