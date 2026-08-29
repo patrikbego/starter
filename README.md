@@ -30,6 +30,7 @@ This repository is intentionally reduced to an index:
 - `docs/` retains the cross-repository design and roadmap ([start here](./docs/README.md)). It is historical coordination material, not the source of truth for either template.
 - Both child directories are git-ignored here. All code lives and evolves in their own repositories.
 - The original monorepo workflows were relocated into each child's `/.github/workflows/`.
+- **Three repos, three remotes**: this index (`patrikbego/starter`), [`patrikbego/starter-backend`](https://github.com/patrikbego/starter-backend), [`patrikbego/starter-mobile`](https://github.com/patrikbego/starter-mobile). Git at the workspace root touches only the index — scope git commands per repository (see [Repository strategy](./docs/REPOSITORY_STRATEGY.md)).
 
 ## Where to go next
 

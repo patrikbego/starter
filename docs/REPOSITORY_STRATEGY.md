@@ -9,6 +9,18 @@ Maintain two independent template repositories:
 
 The current parent repository is a temporary workspace used to design and extract those repositories. It is not the target distribution model.
 
+## Current workspace topology
+
+The workspace is **three independent Git repositories**, each with its own remote:
+
+| Repo | Remote | Content |
+|---|---|---|
+| this index | `patrikbego/starter` | docs, guides, `integrations/` runbooks — no code |
+| `starter-backend/` | `patrikbego/starter-backend` | API template (contract v1 owner) |
+| `starter-mobile/` | `patrikbego/starter-mobile` | Expo client template |
+
+Git commands at the workspace root operate on the index repo only: a bare `git remote -v` or `git status` at the root says nothing about the children. Scope git commands per repository with `git -C starter-backend …` / `git -C starter-mobile …` (or `cd` into the child first), and commit/push per repository — a root-level commit never includes child changes. The children are also git-ignored here (see `.gitignore`), so the index can never re-absorb them.
+
 ## Why two repositories
 
 - Backend and mobile releases are independent.
