@@ -147,13 +147,23 @@ variable is `true`. You only provide the values.
       stripe listen --forward-to localhost:8080/api/v1/billing/webhook
       ```
 
-### 5. PROD (live mode, only after DEV is proven)
+### 5. PROD (test mode wired 2026-08-29; live mode on go-live)
 
-- [ ] Repeat §1 in **live mode** (new product/price/webhook endpoint, `whsec_live_…`).
-- [ ] Repeat §2 against `prod` — `set-secrets.sh prod` with `sk_live_…`/`whsec_live_…`, and the
-      **`_PROD` repo variables** (`BILLING_ENABLED_PROD`, `STRIPE_PRICE_ID_PROD`,
-      `BILLING_SUCCESS_URL_PROD`, `BILLING_CANCEL_URL_PROD`, `BILLING_PORTAL_RETURN_URL_PROD`).
-      The `promote-prod.yml` billing step activates on deploy.
+- [x] **PROD wired in test mode**: terraform applied to `starter-demo-prod` (stripe secrets +
+      Firebase Auth project config as code), `set-secrets.sh prod` with the test key + a **new
+      PROD webhook endpoint** (own `whsec_…`, pointing at
+      `starter-api-prod-599289271429.europe-west2.run.app`), new PROD product + price
+      (`price_1U9iShBX76CeluqMnna2gBlb`, gbp 15/mo — one price per environment), the five
+      `_PROD` repo variables, `promote-prod` green, and the full `billing-e2e.sh` chain
+      verified against the PROD URL.
+- [x] **PROD Firebase initialized** (was GCP-only — authed endpoints would have 401'd on
+      `CONFIGURATION_NOT_FOUND`): project linked to Firebase, web app registered
+      (`1:599289271429:web:1b0b90cf12627925c5c5ec`, API key + authDomain provisioned), anonymous
+      + email/password sign-in enabled via `google_identity_platform_config` in `infra/main.tf`.
+      The mobile **PROD build** config uses these values (app.config.ts / EAS env).
+- [ ] **Live-mode go-live**: repeat §1 in live mode (new product/price/webhook endpoint,
+      `sk_live_…`/`whsec_live_…`), re-run `set-secrets.sh prod`, update `STRIPE_PRICE_ID_PROD`.
+      Everything else already works per environment.
 - [ ] Smoke with a real (small) payment before announcing; CD/rollback rules unchanged
       (see [`starter-backend/docs/cicd_deployment_plan.md`](../starter-backend/docs/cicd_deployment_plan.md)).
 
