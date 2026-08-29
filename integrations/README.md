@@ -13,6 +13,7 @@ buildout history), and the backend/mobile repositories own the implementation do
 | Firestore (database) | ✅ implemented | (provisioned by Terraform — no separate runbook) | [starter-backend/docs/DATABASE.md](../starter-backend/docs/DATABASE.md) |
 | Stripe billing | ✅ implemented, opt-in | [STRIPE.md](./STRIPE.md) | [starter-backend/docs/BILLING_EXTENSION.md](../starter-backend/docs/BILLING_EXTENSION.md) |
 | Resend transactional email | ✅ implemented, opt-in | [RESEND.md](./RESEND.md) | [starter-backend/docs/EMAIL_EXTENSION.md](../starter-backend/docs/EMAIL_EXTENSION.md) |
+| Push notifications (Expo/FCM/APNs) | 🟡 designed, not implemented | [PUSH.md](./PUSH.md) | — |
 | GCS file storage (signed-URL uploads) | 🟡 pattern doc only | (see implementation doc) | [starter-backend/docs/STORAGE_EXTENSION.md](../starter-backend/docs/STORAGE_EXTENSION.md) |
 | Playwright browser E2E vs DEV backend | ✅ P0–P4 implemented | [BROWSER_E2E.md](./BROWSER_E2E.md) | — |
 
