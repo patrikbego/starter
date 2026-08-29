@@ -125,6 +125,37 @@ of a cent per manual run; rate limit on the backend
 projects split by regex (`chromium` excludes, `chromium-ai` matches with retries 0);
 `testID`s added to chat bubbles for deterministic reply selection.
 
+### P6 — Push integration spec ✅ implemented 2026-08-29
+
+`e2e/push.spec.ts` (PR gate, free): proves what a browser CAN prove about push
+([`PUSH.md`](./PUSH.md) has the native part):
+
+1. **Client no-op discipline** — on web, signup completes and the app never sends
+   `PUT /api/v1/push/token` (`registerPushToken` silently skips non-mobile platforms). Push
+   can never break the base flow.
+2. **Live contract/auth posture** — the spec captures the backend origin and the bearer token
+   from the app's own `/api/v1/me` request (no new CI vars/secrets), then drives the real DEV
+   routes with Playwright's `request` fixture: a `me` round-trip proves the token is valid;
+   anonymous → `401 UNAUTHORIZED` envelope; authenticated → `503 PUSH_DISABLED` envelope while
+   the extension is disabled (explicit skip with enable instructions), or the full idempotent
+   register/delete + `400 VALIDATION_ERROR` surface once `PUSH_ENABLED_DEV=true`. While the
+   routes are undeployed, the backend fails closed with 401 (not 404 — see the finding below),
+   which the token-validity control turns into an explicit skip.
+
+Notes: fabricated `ExponentPushToken[e2e-…]` tokens are registry-only until a use case sends,
+and dead tokens self-prune on `DeviceNotRegistered` — no cleanup job needed. Native token
+acquisition and real delivery stay with PUSH.md §5 (EAS development build smoke).
+
+**Finding (2026-08-29, backend behavior, pre-existing):** any unroutable path/method — unknown
+route, wrong method on a known path — answers **401 with the security entry-point envelope,
+not 404**, even with a valid bearer. Cause: unmatched requests fall through to the static
+resource handler's `NoResourceFoundException` → `/error` dispatch → the stateless security
+chain re-authorizes with an empty context (nothing persisted) → entry point fires. Verified
+against DEV: `GET /api/v1/me` 200 and `PUT /api/v1/push/token` 401 with the same token.
+Security-wise fail-closed (route existence is not revealed), but it makes 401 ambiguous for
+API consumers; a fix would let the ERROR dispatch reuse the authenticated context in
+`SecurityConfig`. Tracked as a caveat — not changed as part of the push work.
+
 ### P5 — Housekeeping ✅ adapted 2026-08-24
 
 Sonar stays **local-only** by decision (both repos private → SonarCloud would be paid; hosting
