@@ -1,22 +1,51 @@
 # RESEND.md — Transactional Email Integration (Resend)
 
-**Status: designed, not yet implemented in the templates (2026-08-29).** This is the design +
+**Status: implemented in the templates (2026-08-29), opt-in at runtime.** This runbook is the
 activation checklist for transactional email on the Spring Boot backend (`starter-backend`),
-sent through [Resend](https://resend.com). Same shape as [`STRIPE.md`](./STRIPE.md): what to
-build, what to wire, exact paths. Unlike Stripe there is no code to activate yet — "What to
-build" is the implementation spec; the per-environment sections are the runbook once it lands.
+sent through [Resend](https://resend.com). Same shape as [`STRIPE.md`](./STRIPE.md): what
+exists, what to wire, exact paths. The code is in the template but inert — nothing runs until
+`EMAIL_ENABLED_<ENV>=true` and the Resend material below are provided per environment.
 
 Positioning: **Firebase Auth already sends auth emails** (verification, password reset —
 [`starter-backend/docs/AUTHENTICATION.md`](../starter-backend/docs/AUTHENTICATION.md)). Resend
 covers *product* email the backend originates: welcome, notifications, receipts, digests. The
-template ships only the wiring (port + fail-closed config + adapters); products add their own
-templates and triggers. No new API routes, no OpenAPI change, nothing on mobile.
+template ships the wiring (port + fail-closed config + adapters) **plus one generic trigger** —
+a plain welcome email on signup (JIT provisioning, see §3). Products replace the welcome copy
+with branded templates and add their own triggers. No new API routes, no OpenAPI change,
+nothing on mobile.
+
+### Email confirmation is Firebase-native, not Resend
+
+Decision (2026-08-29): **email confirmation does not go through Resend.** Firebase owns it:
+
+```text
+mobile (firebase/auth) ──sendEmailVerification()──▶ Firebase ──branded verify email──▶ user
+user clicks link ──▶ Firebase marks emailVerified ──reflected in──▶ ID token claim: email_verified
+backend ──reads email_verified off the verified ID token──▶ 403 EMAIL_NOT_VERIFIED on gated routes
+```
+
+- The client triggers it, and the template wires it: `AuthProvider.signUp` fires
+  `sendEmailVerification()` best-effort right after account creation, and the login screen
+  offers `Forgot password?` (`sendPasswordResetEmail`). The backend has no route and sends
+  nothing.
+- **The template wires one example gate**: `POST /api/v1/ai/chat` (the cost-bearing route)
+  refuses unverified identities with `403 EMAIL_NOT_VERIFIED` (`ChatService` check, kill switch
+  still takes precedence; local mock tokens are `email_verified=true`). Mobile's
+  `useChat`/adapter surfaces the 403 — handle it as a permission state prompting verification.
+  Products gate whichever routes their abuse model demands; see AUTHENTICATION.md "Claims and
+  roles".
+- Never store a parallel confirmed flag on the user record — that would duplicate Firebase as a
+  second source of truth.
+- Reaching for Resend here would mean token storage, a public confirm route, an OpenAPI
+  contract change, and a rate-limited resend endpoint — all to duplicate `email_verified`.
+  Only reconsider if a product needs branded verification mail (Identity Platform templating
+  is the other escape hatch).
 
 ---
 
-## Where it will live
+## Where the implementation lives
 
-| Piece | Path (to create unless noted) | Pattern to copy |
+| Piece | Path | Mirrors |
 |---|---|---|
 | Port | `starter-backend/src/main/java/com/starter/ports/EmailPort.java` | [`BillingPort.java`](../starter-backend/src/main/java/com/starter/ports/BillingPort.java) |
 | Config binding (fail-closed) | `starter-backend/src/main/java/com/starter/config/EmailConfig.java` | [`BillingConfig.java`](../starter-backend/src/main/java/com/starter/config/BillingConfig.java) |
@@ -27,7 +56,8 @@ templates and triggers. No new API routes, no OpenAPI change, nothing on mobile.
 | Secret-creation flag | edit [`infra/scripts/set-secrets.sh`](../starter-backend/infra/scripts/set-secrets.sh) | `--stripe-secret-key` case |
 | Deploy step (DEV) | edit [`.github/workflows/deploy-dev.yml`](../starter-backend/.github/workflows/deploy-dev.yml) | "Configure billing extension (DEV)" step |
 | Deploy step (PROD) | edit [`.github/workflows/promote-prod.yml`](../starter-backend/.github/workflows/promote-prod.yml) | "Configure billing extension (PROD)" step |
-| Design & security notes | `starter-backend/docs/EMAIL_EXTENSION.md` | [`BILLING_EXTENSION.md`](../starter-backend/docs/BILLING_EXTENSION.md) |
+| Design & security notes | [`docs/EMAIL_EXTENSION.md`](../starter-backend/docs/EMAIL_EXTENSION.md) | [`BILLING_EXTENSION.md`](../starter-backend/docs/BILLING_EXTENSION.md) |
+| Tests | `EmailConfigTest`, `ResendEmailAdapterTest` (HTTP shape + failure mapping), `MockEmailAdapterTest`, `ConfigFailClosedTest` | billing test siblings |
 
 Routes: **none**. Email is a backend-internal capability behind the port; use cases call it as a
 side effect of existing flows. If a product later needs delivery/bounce events, add an optional
@@ -35,7 +65,7 @@ webhook route mirroring the Stripe pattern (see §Optional webhooks).
 
 ---
 
-## What to build (implementation spec)
+## What exists (implementation notes)
 
 ### 1. Port — `EmailPort`
 
@@ -118,12 +148,13 @@ Logging: **never** log `to`, `subject`, or body content (email addresses are PII
 inspection and returns a fake id. Same caveat as `MockBillingAdapter`: signature-free shortcuts
 never leave a dev machine — `local` must never be deployed.
 
-### 5. Wiring diffs
+### 5. Wiring (already in the template — run terraform when enabling)
 
-- **`infra/main.tf`** — add `"resend-api-key"` to `local.secrets` (next to the stripe entries),
-  then `terraform plan/apply`. Without this, Cloud Run's runtime SA cannot read the secret and
-  `set-secrets.sh` versions are invisible to the service.
-- **`infra/scripts/set-secrets.sh`** — add a case mirroring `--stripe-secret-key`:
+- **`infra/main.tf`** — `"resend-api-key"` is listed in `local.secrets` (next to the stripe
+  entries). Run `terraform plan/apply` once per environment before `set-secrets.sh`, otherwise
+  Cloud Run's runtime SA cannot read the secret version.
+- **`infra/scripts/set-secrets.sh`** — supports `--resend-api-key` (mirrors
+  `--stripe-secret-key`):
 
   ```bash
   --resend-api-key)
@@ -133,8 +164,9 @@ never leave a dev machine — `local` must never be deployed.
     ;;
   ```
 
-- **Deploy workflows** — a "Configure email extension" step in both `deploy-dev.yml` and
-  `promote-prod.yml`, gated on the repo variable, and **always `--update-*`** (see Rules):
+- **Deploy workflows** — a "Configure email extension" step already exists in both
+  `deploy-dev.yml` and `promote-prod.yml`, gated on the repo variable, and **always
+  `--update-*`** (see Rules):
 
   ```yaml
   - name: Configure email extension (DEV)
@@ -193,9 +225,12 @@ never leave a dev machine — `local` must never be deployed.
       ```bash
       gcloud run services describe <svc> --format='yaml(spec.template.spec.containers[0].env)'
       ```
-- [ ] There is **no route to trigger a send** — the template has none by design. First real
-      send happens through the first product trigger; verify it in the Resend dashboard →
-      **Logs** (every send appears there with delivered/bounced status).
+- [ ] **End-to-end smoke — the template's welcome-email trigger.** On first authenticated
+      request the backend JIT-provisions the user and `WelcomeEmailService` sends the generic
+      welcome email (`/api/v1/me` is the cheapest trigger). Sign in as a **fresh** user against
+      DEV (anonymous users have no email and are skipped by design), then check the Resend
+      dashboard → **Logs** — every send appears there with delivered/bounced status. The
+      response of the triggering request never reflects the email outcome (degrades silently).
 
 ### 4. Local development
 
