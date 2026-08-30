@@ -4,6 +4,9 @@ One runbook per external integration. Each doc is the single home for *how to ac
 configure that integration for a product app*; `guides/` keeps the *when* (derivation order,
 buildout history), and the backend/mobile repositories own the implementation docs.
 
+> Status and priorities for every integration (done, missing, cost, Spring coverage) live in
+> [`docs/integrations-plan.md`](../docs/integrations-plan.md).
+
 ## Product-facing integrations (runtime)
 
 | Integration | Status | Runbook | Implementation doc |
@@ -16,6 +19,7 @@ buildout history), and the backend/mobile repositories own the implementation do
 | Push notifications (Expo/FCM/APNs) | ✅ implemented, opt-in | [PUSH.md](./PUSH.md) | [starter-backend/docs/PUSH_EXTENSION.md](../starter-backend/docs/PUSH_EXTENSION.md) |
 | GCS file storage (signed-URL uploads) | 🟡 pattern doc only | (see implementation doc) | [starter-backend/docs/STORAGE_EXTENSION.md](../starter-backend/docs/STORAGE_EXTENSION.md) |
 | Playwright browser E2E vs DEV backend | ✅ P0–P4 implemented | [BROWSER_E2E.md](./BROWSER_E2E.md) | — |
+| Mailtrap email sandbox (auth-email capture for E2E) | ✅ code + runbook ready, relay + API token active on DEV; **spec is manual-run only, excluded from the PR gate** (quota-sensitive) | [MAILTRAP.md](./MAILTRAP.md) | — |
 
 ## Operational integrations
 
