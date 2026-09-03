@@ -66,6 +66,7 @@ The core question of this guide. Same computer, same accounts:
 | OpenRouter account | ✅ reuse | **create a new API key per app** — per-app spend tracking; feed it to that app's Secret Manager only. Key click-path + traps: [`integrations/OPENROUTER_AI.md`](../integrations/OPENROUTER_AI.md) |
 | Stripe account (optional billing) | ✅ reuse account | **per app/env**: new product + price, new webhook endpoint, new API key + signing secret (test mode first, live for PROD). Full runbook: [`integrations/STRIPE.md`](../integrations/STRIPE.md) |
 | Firebase | ❌ new | new project per app (DEV + PROD), new Web-app registration per project, new test users; never point an app's prod binary at another app's Firebase. Runbook: [`integrations/FIREBASE_AUTH.md`](../integrations/FIREBASE_AUTH.md) |
+| App Check (optional, off by default) | ❌ new per app+env | enable per console (both DEV/PROD projects) + link a reCAPTCHA Enterprise web key; set backend repo vars `APP_CHECK_ENABLED_DEV/PROD` + `APP_CHECK_PROJECT_NUMBER_DEV/PROD`, mobile `EXPO_PUBLIC_RECAPTCHA_ENTERPRISE_SITE_KEY`. Runbook: [`integrations/APP_CHECK.md`](../integrations/APP_CHECK.md) |
 | Play Console ($25 once) | ✅ account fee is one-time | new app entry per Android app + its own signing/upload key flow |
 | Sonar (localhost:9000) | ✅ reuse server | new project keys; run `local-gate.sh <new-key>` |
 | `FIREBASE_WEB_API_KEY` + `FIREBASE_TEST_USER_EMAIL/_PASSWORD` (optional auth smoke, future E2E) | ❌ new values | from THIS app's DEV Firebase project; same secret names as the template. Click-paths: [`integrations/FIREBASE_AUTH.md`](../integrations/FIREBASE_AUTH.md) |
@@ -152,6 +153,10 @@ The core question of this guide. Same computer, same accounts:
       runbook [`integrations/STRIPE.md`](../integrations/STRIPE.md) — Stripe product/price +
       webhook endpoint, two new Secret Manager secrets, four `--set-env-vars` additions. The
       extension stays `503 BILLING_DISABLED` until `BILLING_ENABLED=true`.
+- [ ] **Optional — App Check** (client attestation; off by default): console Get started in both
+      Firebase projects + link a reCAPTCHA Enterprise web key; set backend repo vars
+      `APP_CHECK_ENABLED_DEV` + `APP_CHECK_PROJECT_NUMBER_DEV` (gate DEV smoke), then the `_PROD`
+      pair after the smoke passes. Runbook: [`integrations/APP_CHECK.md`](../integrations/APP_CHECK.md).
 - [ ] Trigger **Deploy to DEV** → chain green (`verify → build-and-push → deploy-dev → smoke-dev`),
       `/health/*` 200, unauth `/api/v1/me` 401. Copy the DEV URL — the mobile repo needs it.
 - [ ] PROD mirror: `prod.tfvars` → plan/apply prod → `_PROD` secrets → **two** cross-project
@@ -195,6 +200,10 @@ The core question of this guide. Same computer, same accounts:
       ⚠️ two non-negotiables stay inline:
       (1) put the `EXPO_PUBLIC_FIREBASE_*` trio as repo **variables**
       AND EAS `preview` environment vars (both places — runner env *and* cloud build env; Step 5 §5);
+      `EXPO_PUBLIC_RECAPTCHA_ENTERPRISE_SITE_KEY` follows the same dual-location rule (App Check —
+      optional, off by default, see [`integrations/APP_CHECK.md`](../integrations/APP_CHECK.md);
+      `EXPO_PUBLIC_APP_CHECK_ENABLED` flips it on (absent/false = off; the toggle also controls
+      whether PROD builds demand the site key);
       (2) name projects to respect the env guards (`src/config/envValidation.ts:31`): a PROD
       build fails if `EXPO_PUBLIC_FIREBASE_PROJECT_ID` matches `-dev([.-]|$)`; DEV/preview builds
       fail on `-prod` ids. Keep dev/prod Firebase ids unambiguous.

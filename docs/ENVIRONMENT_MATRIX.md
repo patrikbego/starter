@@ -55,6 +55,14 @@ Recommended operational variables:
 | `AI_RATE_LIMIT_WINDOW` | Length of the per-user quota window (now required in cloud profiles) |
 | `LOG_FORMAT` | Human local logs versus structured cloud logs |
 
+Optional App Check extension (off by default; see `integrations/APP_CHECK.md`):
+
+| Variable | Source | Notes |
+|---|---|---|
+| `APP_CHECK_ENABLED_DEV` / `APP_CHECK_ENABLED_PROD` | GitHub repo variables | Set `true` to turn enforcement on for that environment |
+| `APP_CHECK_PROJECT_NUMBER_DEV` / `APP_CHECK_PROJECT_NUMBER_PROD` | GitHub repo variables | The Firebase project number (token `aud`); not a secret |
+| `APP_CHECK_JWKS_URI` | Environment | Optional override; defaults to the Firebase App Check JWKS |
+
 ### `dev-local`
 
 | Variable | Required | Notes |
@@ -83,6 +91,8 @@ Use EAS environments so the same public variable names resolve to environment-sp
 | `EXPO_PUBLIC_FIREBASE_API_KEY` | DEV Firebase value | PROD Firebase value |
 | `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN` | DEV domain | PROD domain |
 | `EXPO_PUBLIC_FIREBASE_PROJECT_ID` | `{app}-dev` | `{app}-prod` |
+| `EXPO_PUBLIC_APP_CHECK_ENABLED` | `false` (default) | `false` — set `true` only when the product enables App Check |
+| `EXPO_PUBLIC_RECAPTCHA_ENTERPRISE_SITE_KEY` | DEV site key (needed only when the toggle is on; test key OK for the DEV E2E smoke) | PROD site key — **required only when the toggle is on** (`envValidation` fails otherwise) |
 | `EAS_PROJECT_ID` | Product EAS project | Same product EAS project |
 
 Target behavior:

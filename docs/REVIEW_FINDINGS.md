@@ -42,7 +42,7 @@ The prototype proves the core integration loop — Firebase identity, a Firestor
 - [Partially — Phase 3/4] API contract tests: backend `OpenApiContractTest` done; mobile contract validation (`npm run validate:contract`, incl. DTO surface in `src/api/types.ts`) done; backend ↔ mobile integration fixtures remain.
 - [Done — Phase 4; expanded 2026-08-29] Mobile test suite: 105 Jest tests over env validation (incl. EAS profile/`APP_ENV` pairing), auth-gate unit + routing component, HTTP adapter (401 refresh/retry, shared singleflight refresh, sign-out on forced-refresh failure, error envelope decoding, network failure), and chat error UX, plus the contract digest-pin guard.
 - [Open] Structured release metadata, SLOs, alerts, rollback drill — digest capture exists; SLOs/alerts are Phase 5.
-- [Open] Firebase App Check — out of scope until abuse patterns justify the cost.
+- [Done — 2026-08-31] Firebase App Check — backend verifies `X-Firebase-AppCheck` manually (RS256 JWT/JWKS; the Java Admin SDK has no AppCheck API); requires a valid token on `/api/v1/ai/chat` when enabled (default off, PROD-on); web provider shipped, native stubbed.
 - [Open] Database indexes/retention/export/restore and deletion policies — documented; product-data territory.
 
 ## Caveats (roadmap Phase 3 — implemented but with documented limits, not fixed)

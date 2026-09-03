@@ -61,7 +61,7 @@ Decisions that shape everything else:
 | # | Now item | Status |
 |---|---|---|
 | 1 | Firestore deny-all rules + IAM | ✅ rules file, `firebase.json` wiring, deploy script added; IAM already least-privilege. Deploying rules = Phase 5/6 |
-| 2 | App Check (client + backend verify) | ⛔ blocked on Phase 5/6 (needs firebase-admin v12+ for `FirebaseAppCheck.verifyToken`, Firebase console provider setup, and deployment to test) |
+| 2 | App Check (client + backend verify) | ✅ done (web; native stubbed) — backend verifies RS256 JWT/JWKS manually (the Java Admin SDK has no AppCheck API, so no SDK bump unlocks it); requires a valid token on `/api/v1/ai/chat` when enabled (default off, PROD-on); web provider shipped. Live smoke = Phase 5/6 |
 | 3 | Cloud Run cost containment | ✅ `min=0` / `concurrency` encoded in deploy workflows; `max-instances` = attack budget. Live application = Phase 5/6 |
 | 4 | AI cost controls | ✅ kill-switch `AI_ENABLED` added; quota/caps/timeout already baseline. Budgets-as-code added to `infra/` + `COST_CONTROLS.md` runbook; live apply/wiring = Phase 5/6 |
 | 5 | Firebase Hosting web + CORS/headers | ⛔ blocked on Phase 5/6 (deployment) |
@@ -77,7 +77,11 @@ Decisions that shape everything else:
 
 #### Blocked on Phase 5/6 (deployment) — deferred, do not force
 
-- **App Check** (client init + Spring `verifyToken`): needs the firebase-admin SDK bumped to a version with `FirebaseAppCheck` (a deliberate change to the Phase 3 baseline), a Firebase console App Check provider, and a deployed environment to exercise. Reopen in Phase 5.
+- **App Check** (client init + Spring `verifyToken`): **implemented** — because the Java Admin
+  SDK has no `AppCheck.verifyToken` (verified in `firebase-admin:9.10.0`), the backend verifies
+  the RS256 token manually against the project's public keys (Nimbus JWT/JWKS). Web provider
+  shipped; native (Play Integrity / App Attest) stubbed pending the native module + console
+  registration. Enforcement off by default, PROD-on after a live smoke.
 - **Firebase Hosting** web app + CORS origin + security headers on the served app.
 - **Budget/spend alerts applied**: the budget resources (50/90/100% + forecast, Pub/Sub + optional email) are written in `infra/main.tf` but only materialize once `billing_account_id` is set in the tfvars and `terraform apply` runs against the live billing account; automating the stop actions (Pub/Sub → Cloud Function) is also Phase 5/6.
 - **Sign-up abuse gate**: Auth blocking functions / reCAPTCHA + disabling anonymous auth (needs Cloud Functions deployment).
@@ -108,9 +112,19 @@ Legend: ✅ baseline already in code · 🟡 partial, finish it · ⬜ new work
 
 ### 2. Firebase App Check (authentication + client authenticity)
 
-- ⬜ **Clients**: initialize App Check in `starter-mobile` — web: reCAPTCHA Enterprise provider; native: Play Integrity (Android) / App Attest (iOS, DeviceCheck fallback). Send the token as `X-Firebase-AppCheck` on every request.
-- ⬜ **Backend**: verify the App Check token in Spring (firebase-admin `FirebaseAppCheck.verifyToken()`). Policy: reject requests with an invalid token; require a valid token on `/api/v1/ai/chat` from v1; treat it as an auxiliary signal elsewhere, never as a replacement for authentication.
-- ⬜ Note: App Check tokens are replayable until expiry and web attestation is bypassable by headless clients — set expectations accordingly. It raises the bar for casual scripters; per-user quotas are the real abuse control.
+- ✅ **Backend** verifies the App Check token (`X-Firebase-AppCheck`) with a manual RS256
+  JWT/JWKS check (Nimbus) — the Java Admin SDK has no `AppCheck.verifyToken`, so no dependency
+  bump unlocks it. `AppCheckVerifier` port + `JwksAppCheckVerifier` adapter (`!local`) + `MockAppCheckVerifier`
+  (local) + `AppCheckFilter` (require on `/api/v1/ai/chat`, verify-if-present elsewhere).
+- ✅ **Web client**: `@firebase/app-check` reCAPTCHA Enterprise provider; header sent on every
+  request (omitted when unavailable). See [`integrations/APP_CHECK.md`](../integrations/APP_CHECK.md).
+- ⬜ **Native client** (Play Integrity / App Attest): stubbed to `null` on native — the native
+  module + console registration are a follow-up. Until then, native devices send no token, which
+  the backend accepts except where required.
+- Policy: reject invalid tokens regardless of route; **require** a valid token on `/api/v1/ai/chat`
+  from v1; treat as an auxiliary signal elsewhere, never as an authentication replacement.
+- Note: App Check tokens are replayable until expiry and web attestation is bypassable by headless
+  clients — it raises the bar for casual scripters; per-user quotas are the real abuse control.
 
 ### 3. Cloud Run cost containment (the flood ceiling)
 
