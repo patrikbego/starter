@@ -13,6 +13,7 @@ buildout history), and the backend/mobile repositories own the implementation do
 |---|---|---|---|
 | Firebase Authentication | ✅ implemented | [FIREBASE_AUTH.md](./FIREBASE_AUTH.md) | [starter-backend/docs/AUTHENTICATION.md](../starter-backend/docs/AUTHENTICATION.md) |
 | Firebase App Check | ✅ implemented (web), 🟡 native stubbed | [APP_CHECK.md](./APP_CHECK.md) | [starter-backend/docs/SECURITY.md](../starter-backend/docs/SECURITY.md) |
+| Sign-up abuse gate | 🟡 plan + runbook ready, phased A→C→B (no code yet) | [SIGNUP_ABUSE_GATE.md](./SIGNUP_ABUSE_GATE.md) | (Phase C backend work not started) |
 | AI chat via OpenRouter | ✅ implemented | [OPENROUTER_AI.md](./OPENROUTER_AI.md) | [starter-backend/docs/AI_INTEGRATION.md](../starter-backend/docs/AI_INTEGRATION.md) |
 | Firestore (database) | ✅ implemented | (provisioned by Terraform — no separate runbook) | [starter-backend/docs/DATABASE.md](../starter-backend/docs/DATABASE.md) |
 | Stripe billing | ✅ implemented, opt-in | [STRIPE.md](./STRIPE.md) | [starter-backend/docs/BILLING_EXTENSION.md](../starter-backend/docs/BILLING_EXTENSION.md) |

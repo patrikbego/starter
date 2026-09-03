@@ -31,8 +31,8 @@ Status legend: ✅ implemented · 🟡 partial (pattern doc only / pending live 
 
 | Integration | Status / blockers | Priority | Effort | Free at template scale? | Spring can do it? | Notes |
 |---|---|---|---|---|---|---|
-| Sign-up abuse gate (reCAPTCHA Enterprise / blocking functions) | ⛔ blocked on deployment | High | ~1 day | ✅ 10k free assessments/mo | 🟡 verification is a Google API call via `RestClient` | Cheap uid minting lets attackers rotate past AI quotas |
-| Analytics + feature flags (PostHog or Firebase Remote Config) | ❌ | Medium | ~1 day | ✅ ~1M events/mo free | 🟡 `RestClient` adapter like Resend | Gives an AI kill-switch |
+| Sign-up abuse gate (reCAPTCHA Enterprise / App Check enforcement / blocking functions) | 🟡 plan + runbook ready, phased A→C→B — A: console-only, gated on native App Check wiring; C: v1 target, contract change; B: evidence-triggered ([runbook](../integrations/SIGNUP_ABUSE_GATE.md)) | High | A: console-only · C: ~1 day · B: 2–3 days | 🟡 10k assessments/mo free but **org-wide, shared with App Check minting**; Essentials hard-stops with 429 | 🟡 verification is a Google API call via `RestClient` | Blocking functions cannot receive a reCAPTCHA token (no client channel; `recaptchaScore` is SMS-only) — C must be Spring-mediated sign-up |
+| Analytics + feature flags — **PostHog chosen** (Firebase Remote Config = documented flags-only fallback) | ❌ vendor decided, not implemented | Medium | ~1 day | ✅ 1M events + 1M flag requests/mo free, hard stop at limit | 🟡 `RestClient` adapter like Resend | One tool covers analytics + flags + the AI kill-switch (decision in §5) |
 | Firebase Hosting web + security headers | ⛔ blocked on deployment | Medium | ~half day | ✅ free tier (10 GB) | ❌ CDN layer, not Spring | Expo web delivery + CORS/headers |
 | GCS file storage (signed-URL uploads) | 🟡 `ObjectStoragePort` pattern doc only, no code | Medium | 1–2 days | ✅ GCS free tier (5 GB) | ✅ `spring-cloud-gcp-storage` | Extension by design ([`STORAGE_EXTENSION.md`](../starter-backend/docs/STORAGE_EXTENSION.md)) |
 | Social login (Google/Apple) | ❌ Email/Password only today | Low (Apple → Medium if Google is added) | ~1 day | ✅ Firebase providers are free | 🟡 mostly client + console; backend unchanged (claims ride the token) | Sign in with Apple is **mandatory on iOS** if any other social login exists |
@@ -83,6 +83,21 @@ the architecture.
   (not deprecated `sentry-expo`); web is excluded at v1 (the RN SDK has no react-native-web
   support). Activation is off by default and needs a console/DSN per app.
   Runbook: [`../integrations/SENTRY.md`](../integrations/SENTRY.md).
+- **PostHog is the analytics + feature flags vendor**; Firebase Remote Config stays the
+  documented flags-only fallback. Firebase GA4 cannot deliver the analytics half in this
+  template — its JS SDK is browser-only, and native would require `@react-native-firebase`,
+  a native-module stack the template deliberately avoided (web is first-class; see the App
+  Check web-provider precedent). PostHog covers analytics + flags from one SDK on web and
+  native (`posthog-react-native`, official Expo guide), with server-side local evaluation
+  for backend flags. v1 shape: vendor-neutral `FeatureFlagPort` (backend) + `AnalyticsPort`
+  (mobile), PostHog adapters, simple boolean flags only (no Java re-implementation of hashed
+  rollout evaluation). AI kill-switch is **non-breaking**: static `starter.ai.enabled` stays
+  as the fallback; the remote flag `ai-chat-enabled` only ever kills — provider down ⇒
+  static config decides. Free tier: 1M analytics events + 1M flag requests/mo, usage
+  hard-stops at the limit (snapshot 2026; re-verify). Caveats: verify
+  `posthog-react-native` on react-native-web during implementation (gate web off
+  Sentry-style if it misbehaves); keys are per-app/per-env client values, the backend
+  `local_evaluation` personal key is a Secret Manager secret.
 - **Background jobs ship as a mechanism, not product jobs** — `starter.jobs` is off by default
   (no scheduler when disabled); `local` has a demo job only. In-process `@Scheduled` is not
   durable on scale-to-zero Cloud Run, so the durable path is Cloud Scheduler/Tasks →
@@ -94,7 +109,7 @@ the architecture.
 1. **Firebase App Check** — ✅ done (security; backend JWT/JWKS + web provider, PROD-on)
 2. **Sentry** — ✅ done (observability; backend 5xx handler capture + mobile native, opt-in, web at v1)
 3. **Background jobs** — ✅ done (mechanism opt-in; Cloud Scheduler/Tasks activation = per app)
-4. **Analytics + feature flags** (~1 day) — AI kill-switch
+4. **Analytics + feature flags** (~1 day) — PostHog (decided, §5): backend `FeatureFlagPort` + AI kill-switch, mobile `AnalyticsPort` + base events
 5. Everything else when a product fork needs it (extension rule)
 
 ## 7. Delivery tail (not integrations, but blocks v1)

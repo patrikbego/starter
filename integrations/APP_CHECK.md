@@ -26,7 +26,9 @@ Not fully rolled out — the template ships the mechanism, but activation needs 
 - **Native mobile (iOS/Android) is not wired.** `createFirebaseAppCheckAdapter` returns `null` on
   native, so native devices send no App Check token. Adding Play Integrity / App Attest requires
   the `@react-native-firebase/app-check` module + its Expo config plugin + per-app console
-  registration — a deliberate, EAS-build-verified follow-up.
+  registration — a deliberate, EAS-build-verified follow-up. **This also gates Phase A of the
+  sign-up abuse gate** (App Check enforcement on Identity Platform would break native sign-in
+  until native tokens exist) — see [SIGNUP_ABUSE_GATE.md](./SIGNUP_ABUSE_GATE.md).
 - **Console provisioning is manual** (see below) — Get started + app registration in both DEV and
   PROD Firebase projects; no API creates it.
 - **Enforcement is off by default.** Flip the **repo variables** on the backend repository
@@ -101,7 +103,10 @@ Same console-only bootstrap nature as Auth (no API creates it):
    Attest + DeviceCheck), Web (reCAPTCHA Enterprise site key, created in Google Cloud console and
    linked).
 3. **Keep enforcement OFF** in the console — this backend is the enforcement point (console
-   enforcement only governs Firebase services, not this Spring API).
+   enforcement only governs Firebase services, not this Spring API). **One exception:** App Check
+   enforcement on **Identity Platform** (Auth sign-up/sign-in/reset) is Phase A of the sign-up
+   abuse gate — flip it only after native App Check is wired and a live smoke passed, per
+   [SIGNUP_ABUSE_GATE.md](./SIGNUP_ABUSE_GATE.md).
 4. Distribute values: site key → `EXPO_PUBLIC_RECAPTCHA_ENTERPRISE_SITE_KEY` (EAS env + GitHub
    repo vars, dual-location rule); project number → backend **repo variables**
    `APP_CHECK_PROJECT_NUMBER_DEV/PROD` (not a secret — public in Firebase app config). Both deploy
@@ -127,7 +132,9 @@ Same console-only bootstrap nature as Auth (no API creates it):
 ## Cost
 
 App Check itself is free; it is *not* a billing line. The only coupling is web reCAPTCHA
-Enterprise assessments (~10k/mo free, snapshot 2026 — re-verify). Native providers (Play
+Enterprise assessments (~10k/mo free, snapshot 2026 — re-verify). **The 10k pool is org-wide**
+— sign-up assessments (sign-up gate Phase C) share it; Essentials hard-stops with `429` beyond
+the limit ([SIGNUP_ABUSE_GATE.md](./SIGNUP_ABUSE_GATE.md)). Native providers (Play
 Integrity / App Attest) are free.
 
 ## Rules that must not be broken
