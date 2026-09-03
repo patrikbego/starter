@@ -77,25 +77,30 @@ Caveats:
 ## Phase C — Spring-mediated sign-up (v1 target)
 
 Move sign-up through the API so the assessment happens before a uid exists. Fits the port +
-adapter house pattern exactly (`RecaptchaPort` + `RestClient` adapter + fail-closed config +
-`local` mock — same shape as `EmailPort`).
+adapter house pattern exactly (port + `RestClient` adapter + fail-closed config + `local` mock —
+same shape as `EmailPort`).
 
-Pieces (all ⬜):
+Status: **backend implemented** (2026-09: route in the contract, gate default-off); **mobile
+adoption open** (see caveat below).
 
-- **Contract**: new endpoint in `starter-backend/openapi.yaml`, e.g. `POST /api/v1/auth/sign-up`
-  `{email, password, recaptchaToken}` → `201`; error mapping `RECAPTCHA_INVALID` (403),
-  `EMAIL_EXISTS` (409). Backend owns the contract; mobile consumes via the pinned digest.
-- **Backend**: `RecaptchaPort` → `RecaptchaRestAdapter` calling
-  `POST https://recaptchaenterprise.googleapis.com/v1/projects/{project}/assessments` via
-  `RestClient`; check token validity, expected action, score threshold. App Check **required** on
-  this route (join `AppCheckFilter`'s required list). Config `starter.recaptcha.*` (site key
-  secret, action, min-score, enabled per env); fail closed when enabled.
-- **Backend**: user creation via Firebase Admin SDK `createUser` after the assessment passes.
-  Never log password or the reCAPTCHA token.
-- **Mobile**: `AuthPort.signUp` gains the token: mint a reCAPTCHA Enterprise token (same site key
-  as App Check: `EXPO_PUBLIC_RECAPTCHA_ENTERPRISE_SITE_KEY`), call the API, then sign in via
-  Firebase (Admin SDK creates no session — no auto-sign-in like `createUserWithEmailAndPassword`).
-- **Email verification** stays Firebase-native and unaffected.
+- ✅ **Contract**: `POST /api/v1/auth/sign-up` in `starter-backend/openapi.yaml`
+  `{email, password, recaptchaToken?}` → `201 {uid}`; `403 RECAPTCHA_INVALID`, `409 EMAIL_EXISTS`,
+  `502 RECAPTCHA_PROVIDER_ERROR`. Mobile pins the re-pinned digest (`c19e8a1a…`).
+- ✅ **Backend**: `RecaptchaConfig` (`starter.recaptcha.*`, fail-closed) → `RecaptchaAssessorPort`
+  → `RecaptchaEnterpriseAdapter` (`RestClient`, API-key auth, timeouts) + `MockRecaptchaAssessor`
+  (local). Policy in `SignUpService`: blank token / failed verdict / wrong action / score below
+  `starter.recaptcha.min-score` → `403 RECAPTCHA_INVALID`; assessor outage → `502` and **no
+  account minted**. App Check **required** on the route when enabled (`AppCheckFilter`).
+- ✅ **Backend**: account creation via Admin SDK `createUser` (`AccountCreatorPort`, implemented
+  by `FirebaseAuthServiceImpl`; `MockAccountCreator` under `local`). Passwords and tokens never
+  logged. Env: `RECAPTCHA_ENABLED`, `RECAPTCHA_PROJECT_ID`, `RECAPTCHA_SITE_KEY`,
+  `RECAPTCHA_API_KEY` (Secret Manager), `RECAPTCHA_EXPECTED_ACTION`, `RECAPTCHA_MIN_SCORE`.
+- ⬜ **Mobile adoption**: `AuthPort.signUp` still uses client-direct
+  `createUserWithEmailAndPassword`. Switching it needs (a) web reCAPTCHA Enterprise token minting
+  for the `sign-up` action, and (b) a native decision — native has no reCAPTCHA assessment SDK
+  wired; **native stays on Phase A** (App Check enforcement) until a product needs per-attempt
+  scoring there. Sequence after switching: create via API → then sign in (no auto-session).
+- ✅ **Email verification** stays Firebase-native and unaffected.
 
 Estimate ~1 day of code — the plan's number applies to this phase, not to the whole gate.
 

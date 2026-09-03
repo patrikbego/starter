@@ -65,7 +65,7 @@ Decisions that shape everything else:
 | 3 | Cloud Run cost containment | ✅ `min=0` / `concurrency` encoded in deploy workflows; `max-instances` = attack budget. Live application = Phase 5/6 |
 | 4 | AI cost controls | ✅ kill-switch `AI_ENABLED` added; quota/caps/timeout already baseline. Budgets-as-code added to `infra/` + `COST_CONTROLS.md` runbook; live apply/wiring = Phase 5/6 |
 | 5 | Firebase Hosting web + CORS/headers | ⛔ blocked on Phase 5/6 (deployment) |
-| 6 | Sign-up abuse gate | 🟡 plan + runbook ready, phased A→C→B ([runbook](../integrations/SIGNUP_ABUSE_GATE.md)) — Phase A console-only but gated on native App Check wiring; Phase C = contract change; Phase B needs Cloud Functions (Phase 5/6) |
+| 6 | Sign-up abuse gate | 🟡 phased A→C→B ([runbook](../integrations/SIGNUP_ABUSE_GATE.md)) — A: native App Check wired, console+smoke pending; C: backend implemented (route in contract, gate default-off), mobile adoption open; B needs Cloud Functions (Phase 5/6) |
 | 7 | Observability & errors | ✅ baseline; added `starter.ai.rejected/reason=disabled` metric |
 | 8 | Secrets/CI + supply chain | ✅ baseline (WIF, Dependabot, Trivy gate); image-scanning budget decision still open |
 
@@ -85,7 +85,7 @@ Decisions that shape everything else:
   live smoke.
 - **Firebase Hosting** web app + CORS origin + security headers on the served app.
 - **Budget/spend alerts applied**: the budget resources (50/90/100% + forecast, Pub/Sub + optional email) are written in `infra/main.tf` but only materialize once `billing_account_id` is set in the tfvars and `terraform apply` runs against the live billing account; automating the stop actions (Pub/Sub → Cloud Function) is also Phase 5/6.
-- **Sign-up abuse gate**: phased A→C→B per [integrations/SIGNUP_ABUSE_GATE.md](../integrations/SIGNUP_ABUSE_GATE.md) — Phase A (App Check enforcement on Identity Platform) is console-only but requires native App Check wiring; Phase C (reCAPTCHA assessment on Spring-mediated sign-up) is the v1 target; Phase B (blocking functions) is evidence-triggered. Full plan verified against live Firebase/Google docs; the old "blocking functions + reCAPTCHA" single-mechanism reading was wrong — a `beforeUserCreated` event carries no reCAPTCHA token channel.
+- **Sign-up abuse gate**: phased A→C→B per [integrations/SIGNUP_ABUSE_GATE.md](../integrations/SIGNUP_ABUSE_GATE.md) — Phase A (App Check enforcement on Identity Platform) is console-only with native App Check now wired; Phase C (reCAPTCHA assessment on Spring-mediated sign-up) is **backend-implemented** (route in contract, gate default-off), mobile adoption open; Phase B (blocking functions) is evidence-triggered. Full plan verified against live Firebase/Google docs; the old "blocking functions + reCAPTCHA" single-mechanism reading was wrong — a `beforeUserCreated` event carries no reCAPTCHA token channel.
 - **Deploying the Firestore rules** to the DEV/PROD projects.
 
 ---
@@ -155,8 +155,8 @@ Legend: ✅ baseline already in code · 🟡 partial, finish it · ⬜ new work
 
 Phased A→C→B — details, click-paths, cost traps: [integrations/SIGNUP_ABUSE_GATE.md](../integrations/SIGNUP_ABUSE_GATE.md).
 
-- ⬜ **Phase A**: App Check enforcement on Identity Platform (console toggle) — stops scripted account minting; **gated on native App Check being wired** (native sends no token today and would break).
-- ⬜ **Phase C (v1 target)**: reCAPTCHA Enterprise assessment on a **Spring-mediated sign-up** (`POST /api/v1/auth/sign-up`, backend-owned contract) — assessment must happen before a uid exists; a `beforeUserCreated` blocking function cannot do it (no client token channel; `recaptchaScore` is SMS-only on `beforeSmsSent`).
+- ⬜ **Phase A**: App Check enforcement on Identity Platform (console toggle) — stops scripted account minting; native App Check is **wired in code**, console registration + EAS live smoke remain.
+- 🟡 **Phase C**: reCAPTCHA Enterprise assessment on **Spring-mediated sign-up** — **backend implemented** (`POST /api/v1/auth/sign-up`, `starter.recaptcha.*`, default off; a `beforeUserCreated` blocking function cannot do it — no client token channel; `recaptchaScore` is SMS-only on `beforeSmsSent`). Mobile adoption open; native stays on Phase A until a product needs per-attempt scoring there.
 - ⬜ **Phase B**: `beforeUserCreated` blocking function (Identity Platform upgrade + Blaze + first Cloud Functions deploy) — only on evidence of uid-mint velocity.
 - ⬜ Disable anonymous auth unless a feature explicitly needs it (Phase 0, console-only).
 - Rationale: per-uid quotas are the strongest abuse control in this design — but only as strong as account creation being hard to automate.
