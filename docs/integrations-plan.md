@@ -20,6 +20,7 @@ Status legend: ✅ implemented · 🟡 partial (pattern doc only / pending live 
 | Stripe billing | ✅ opt-in | `BillingPort`/`StripeBillingAdapter`; checkout + portal + webhook (only Firebase-exempt route); `stripe-java` already in pom |
 | Resend transactional email | ✅ opt-in | `EmailPort`/`ResendEmailAdapter` (RestClient, no SDK); fail-closed `EmailConfig`; `MockEmailAdapter` in `local`; welcome email on signup |
 | Push notifications | ✅ opt-in | `PushPort`/`PushTokenPort` + Expo adapter (FCM/APNs); `MockPushAdapter` + in-memory token repo in `local` |
+| Error/crash monitoring (Sentry) | ✅ opt-in | backend `ErrorReporter` port + `SentryErrorReporter` (core SDK, manual init — Boot-4 starter unverified) / `NoOpErrorReporter` (local), 5xx handlers capture; mobile `@sentry/react-native` native-only (web excluded at v1) |
 | Playwright browser E2E | ✅ | vs DEV backend |
 | Slack deploy alerts | ✅ optional | DEV + PROD notify jobs when `SLACK_WEBHOOK` is set |
 | SonarQube local quality gate | ✅ | shared server, per-app project keys |
@@ -29,7 +30,6 @@ Status legend: ✅ implemented · 🟡 partial (pattern doc only / pending live 
 
 | Integration | Status / blockers | Priority | Effort | Free at template scale? | Spring can do it? | Notes |
 |---|---|---|---|---|---|---|
-| Error/crash monitoring (Sentry) | ❌ | **High** | ~30 min/repo | ✅ free dev tier (~5k errors/mo) | ✅ `sentry-spring-boot` + `sentry-expo` | Cheapest win; turns "deployed" into "know it broke" |
 | Sign-up abuse gate (reCAPTCHA Enterprise / blocking functions) | ⛔ blocked on deployment | High | ~1 day | ✅ 10k free assessments/mo | 🟡 verification is a Google API call via `RestClient` | Cheap uid minting lets attackers rotate past AI quotas |
 | Background jobs (Cloud Tasks/Scheduler) | ❌ explicitly disabled by default | Medium | ~1 day | ✅ Scheduler 3 free jobs; Tasks ≈ pennies | ✅ `@Scheduled`/Quartz local + `spring-cloud-gcp` for Cloud Tasks | Stripe retries / digests will force this |
 | Analytics + feature flags (PostHog or Firebase Remote Config) | ❌ | Medium | ~1 day | ✅ ~1M events/mo free | 🟡 `RestClient` adapter like Resend | Gives an AI kill-switch |
@@ -81,7 +81,7 @@ the architecture.
 ## 6. Suggested order of work
 
 1. **Firebase App Check** — ✅ done (security; backend JWT/JWKS + web provider, PROD-on)
-2. **Sentry** (~30 min) — observability, cheapest win
+2. **Sentry** — ✅ done (observability; backend 5xx handler capture + mobile native, opt-in, web at v1)
 3. **Background jobs** (~1 day) — unblocks Stripe retries and digests
 4. **Analytics + feature flags** (~1 day) — AI kill-switch
 5. Everything else when a product fork needs it (extension rule)

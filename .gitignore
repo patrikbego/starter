@@ -17,3 +17,5 @@ shared-infra/sonar/.env
 
 # Agent instructions (local-only; never committed)
 AGENTS.md
+# Maven local repository cache (redirected here by the backend build; regenerated, never commit)
+.m2-local/
