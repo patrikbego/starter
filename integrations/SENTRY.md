@@ -1,11 +1,10 @@
 # SENTRY.md — Error / Crash Monitoring (Sentry)
 
-**Status: planned — runbook drafted, implementation pending.** This is the activation guide for
-error/crash monitoring across the template: [Sentry](https://sentry.io) captures backend 5xx
-failures and mobile native crashes (Free plan ≈ 5k errors/mo, snapshot 2026 — re-verify on the
-[pricing page](https://sentry.io/pricing/)). It is the top item in
-[`docs/integrations-plan.md`](../docs/integrations-plan.md) ("cheapest win — turns deployed into
-*know it broke*").
+**Status: implemented in both templates (2026-09-03), opt-in at runtime.** This runbook is the
+activation checklist for error/crash monitoring across the template: [Sentry](https://sentry.io)
+captures backend 5xx failures and mobile native crashes (Free plan ≈ 5k errors/mo, snapshot
+2026 — re-verify on the [pricing page](https://sentry.io/pricing/)). The code ships but is inert —
+nothing is sent until a product enables it (console + DSN below).
 
 Two independent **Sentry projects** (one per repo): `<app>-backend` (server errors) and
 `<app>-mobile` (app crashes). They share an account/org but never mix.
@@ -39,7 +38,7 @@ starter-mobile  ──native crashes──▶ Sentry <app>-mobile project   (web
 - **Sentry must never break a request.** Every capture is fire-and-forget inside a try/catch;
   no retries, no blocking, SDK disabled (no-op) when unconfigured.
 
-## Where the implementation will live (planned)
+## Where the implementation lives (implemented)
 
 ### Backend (`starter-backend`)
 

@@ -77,6 +77,17 @@ the architecture.
   the earlier "firebase-admin v12 bump" path was a Node-SDK error. Enforcement is off by default
   and PROD-on once a live smoke passes. Runbook: [`../integrations/APP_CHECK.md`](../integrations/APP_CHECK.md).
 - **EAS Update deliberately not retained** for mobile v1 (fingerprint runtime version instead).
+- **Sentry uses the core SDK + manual `Sentry.init`, not the Spring Boot starter** — the template
+  runs Spring Boot 4.1.1 and the starter's Boot-4 support is unverified; core SDK is
+  version-agnostic and matches the manual-JWT/JWKS precedent. Mobile uses `@sentry/react-native`
+  (not deprecated `sentry-expo`); web is excluded at v1 (the RN SDK has no react-native-web
+  support). Activation is off by default and needs a console/DSN per app.
+  Runbook: [`../integrations/SENTRY.md`](../integrations/SENTRY.md).
+- **Background jobs ship as a mechanism, not product jobs** — `starter.jobs` is off by default
+  (no scheduler when disabled); `local` has a demo job only. In-process `@Scheduled` is not
+  durable on scale-to-zero Cloud Run, so the durable path is Cloud Scheduler/Tasks →
+  authenticated HTTP job endpoint per product. No Quartz at v1.
+  Runbook: [`../integrations/BACKGROUND_JOBS.md`](../integrations/BACKGROUND_JOBS.md).
 
 ## 6. Suggested order of work
 

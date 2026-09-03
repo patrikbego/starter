@@ -1,6 +1,6 @@
 # Project Review Findings
 
-Reviewed on 2026-07-20 against the local `docsera` and `docsera-mobile` references and the current starter implementation. Status layer re-verified on 2026-08-17 after roadmap Phase 3 (backend foundation hardening) and again for Phase 4 (mobile foundation hardening). Re-verified on 2026-08-29 after the cross-repo review and hardening pass (contract digest pin, emulator fail-closed gate, HTTP Basic scoping, mobile auth fixes) — see [the 2026-08-29 section](#2026-08-29-cross-repo-review-and-hardening-pass).
+Reviewed on 2026-07-20 against the local `docsera` and `docsera-mobile` references and the current starter implementation. Status layer re-verified on 2026-08-17 after roadmap Phase 3 (backend foundation hardening) and again for Phase 4 (mobile foundation hardening). Re-verified on 2026-08-29 after the cross-repo review and hardening pass (contract digest pin, emulator fail-closed gate, HTTP Basic scoping, mobile auth fixes) — see [the 2026-08-29 section](#2026-08-29-cross-repo-review-and-hardening-pass). Re-verified on 2026-09-03 after the integrations pass (Sentry error monitoring + background-jobs capability) — see [the 2026-09-03 section](#2026-09-03-integrations-pass-sentry--background-jobs).
 
 Status legend:
 
@@ -10,7 +10,7 @@ Status legend:
 
 ## Summary
 
-The prototype proves the core integration loop — Firebase identity, a Firestore user, a server-side AI call, and an Expo client — and the backend suite is green (126 tests, 0 failures). After Phase 3 the backend foundation is materially stronger: fail-closed cloud configuration with explicit `local` mocks, a versioned OpenAPI contract with one error envelope, a supported dependency baseline (Spring Boot 4.1, Spring AI 2.0), bounded AI calls (`429`+`Retry-After`, input caps, timeout), an SBOM-producing build, and repeatable DEV/PROD infrastructure code. After Phase 4 the mobile client is deterministic from a clean install: pinned Node 22, direct ESLint, strict typecheck, 105 Jest tests (env validation, auth gate, HTTP retry/refresh incl. shared singleflight refresh and sign-out on forced-refresh failure, chat errors, contract digest pin, billing, profile, email), contract-checked DTOs with an enforced byte-identity digest pin, AsyncStorage-backed Firebase persistence, per-variant app identifiers/schemes with a profile/`APP_ENV` pairing guard, and a fingerprint runtime version (EAS Update deliberately not retained for v1). What remains is largely external or later-phase: tags and tagged releases, live infrastructure apply, mobile delivery (EAS credentials, store submission), and the documented caveats below. On 2026-08-29 the contract boundary became mechanically enforceable (mobile digest pin), the Firebase emulator was restricted to `dev-local` by a fail-closed startup check, HTTP Basic was scoped to actuator, and the two mobile auth gaps (cache clear on user change, sign-out on refresh failure) were closed.
+The prototype proves the core integration loop — Firebase identity, a Firestore user, a server-side AI call, and an Expo client — and the backend suite is green (197 tests, 0 failures). After Phase 3 the backend foundation is materially stronger: fail-closed cloud configuration with explicit `local` mocks, a versioned OpenAPI contract with one error envelope, a supported dependency baseline (Spring Boot 4.1, Spring AI 2.0), bounded AI calls (`429`+`Retry-After`, input caps, timeout), an SBOM-producing build, and repeatable DEV/PROD infrastructure code. After Phase 4 the mobile client is deterministic from a clean install: pinned Node 22, direct ESLint, strict typecheck, 147 Jest tests (env validation, auth gate, HTTP retry/refresh incl. shared singleflight refresh and sign-out on forced-refresh failure, chat errors, contract digest pin, billing, profile, email, App Check, Sentry init), contract-checked DTOs with an enforced byte-identity digest pin, AsyncStorage-backed Firebase persistence, per-variant app identifiers/schemes with a profile/`APP_ENV` pairing guard, and a fingerprint runtime version (EAS Update deliberately not retained for v1). What remains is largely external or later-phase: tags and tagged releases, live infrastructure apply, mobile delivery (EAS credentials, store submission), the integration-activation step (Sentry console/DSN, Cloud Scheduler/Tasks), and the documented caveats below. On 2026-08-29 the contract boundary became mechanically enforceable (mobile digest pin), the Firebase emulator was restricted to `dev-local` by a fail-closed startup check, HTTP Basic was scoped to actuator, and the two mobile auth gaps (cache clear on user change, sign-out on refresh failure) were closed. On 2026-09-03 the integrations pass shipped opt-in Sentry error monitoring and the background-jobs capability (see [the 2026-09-03 section](#2026-09-03-integrations-pass-sentry--background-jobs)).
 
 ## Priority findings
 
@@ -43,6 +43,8 @@ The prototype proves the core integration loop — Firebase identity, a Firestor
 - [Done — Phase 4; expanded 2026-08-29] Mobile test suite: 105 Jest tests over env validation (incl. EAS profile/`APP_ENV` pairing), auth-gate unit + routing component, HTTP adapter (401 refresh/retry, shared singleflight refresh, sign-out on forced-refresh failure, error envelope decoding, network failure), and chat error UX, plus the contract digest-pin guard.
 - [Open] Structured release metadata, SLOs, alerts, rollback drill — digest capture exists; SLOs/alerts are Phase 5.
 - [Done — 2026-08-31] Firebase App Check — backend verifies `X-Firebase-AppCheck` manually (RS256 JWT/JWKS; the Java Admin SDK has no AppCheck API); requires a valid token on `/api/v1/ai/chat` when enabled (default off, PROD-on); web provider shipped, native stubbed.
+- [Done — 2026-09-03] Sentry error monitoring — opt-in (`starter.sentry.enabled`), backend `ErrorReporter` port + `SentryErrorReporter` (core SDK, manual init — Boot-4 starter unverified) with capture on the 5xx handlers and `correlationId` context; mobile `@sentry/react-native` native-only (web excluded at v1). Live activation (console org/DSN + smoke) is the pending external step — see C14 and `integrations/SENTRY.md`.
+- [Done — 2026-09-03] Background-jobs capability — opt-in (`starter.jobs`), no scheduler when disabled, `local` demo job; durable Cloud Scheduler/Tasks path documented per product (`integrations/BACKGROUND_JOBS.md`).
 - [Open] Database indexes/retention/export/restore and deletion policies — documented; product-data territory.
 
 ## Caveats (roadmap Phase 3 — implemented but with documented limits, not fixed)
@@ -62,20 +64,21 @@ Documented here and in the repo docs (`AI_INTEGRATION.md`, `infra/README.md`, `E
 - **C11 — EAS Update not retained for v1.** `runtimeVersion` policy `fingerprint` is configured as forward-prep, but expo-updates is not installed and no channels/branches exist; OTA stays opt-in (decision + drill work are roadmap Phase 5/6 and the mobile delivery checklist).
 - **C12 — Local typing shim for Firebase RN persistence.** `getReactNativePersistence` is exported only by the SDK's react-native entry, which the shared public types omit; `src/types/firebase-auth.d.ts` augments it (native-only, never called on web). Revisit when Firebase publishes the export in the shared types.
 - **C13 — Unroutable requests answer 401, not 404.** [Found 2026-08-29 by the new push e2e (`e2e/push.spec.ts`), verified against DEV.] Any path/method combination with no controller — unknown route or wrong method on a known path — returns the security entry-point envelope `{"code":"UNAUTHORIZED",...,"Authentication is required..."}` even with a valid bearer, because the `NoResourceFoundException` → `/error` dispatch re-enters the stateless security chain with an empty context (`SecurityConfig` re-authorizes the ERROR dispatch). Fail-closed (never leaks route existence) but makes 401 ambiguous for API consumers and e2e probes; a fix would permit the ERROR dispatch to reuse the authenticated context. Not changed during the push integration.
+- **C14 — Sentry and background jobs are implemented but not activated live.** No Sentry org/DSN exists yet, so no real event has been captured and the DEV 500-smoke from `integrations/SENTRY.md` §4 has not run; the mobile crash path (native) has likewise only been verified by unit tests. In-process `@Scheduled` is not durable on scale-to-zero Cloud Run — the shipped mechanism is local-verifiable only until a product wires Cloud Scheduler/Tasks (runbook `integrations/BACKGROUND_JOBS.md`). Activation is off by default in both cases, so nothing is silently running.
 
-## Verification performed (updated 2026-08-29 — hardening-pass re-verify; earlier: 2026-08-17 Phase 4)
+## Verification performed (updated 2026-09-03 — integrations pass: Sentry + background jobs; earlier: 2026-08-29 hardening pass, 2026-08-17 Phase 4)
 
 | Check | Result |
 |---|---|
-| Backend `./mvnw verify` | Pass — 126 tests, 0 failures/errors, 1 opt-in skip (2026-08-29) |
+| Backend `./mvnw verify` | Pass — 197 tests, 0 failures/errors (2026-09-03; 194 incl. Sentry before jobs) |
 | Firestore emulator integration (Testcontainers, opt-in) | Pass — ran with `RUN_FIRESTORE_EMULATOR_TEST=true` |
 | Backend container build | Pass — image boots; liveness 200; stateless AI echo works |
 | Backend SBOM | `bom.json` at `starter-backend/target/bom.json` (CycloneDX 1.6) |
 | Mobile clean install `npm ci` (Node 22 per `.nvmrc`, lockfile) | Pass |
-| Mobile `validate:contract` | Pass — pinned backend contract v1 + `src/api/types.ts` DTO surface + byte-identity digest pin (2026-08-29) |
+| Mobile `validate:contract` | Pass — pinned backend contract v1 + `src/api/types.ts` DTO surface + byte-identity digest pin (2026-09-03) |
 | Mobile `typecheck` | Pass (strict) |
 | Mobile `lint` (`npm run lint`, direct ESLint) | Pass |
-| Mobile `test:ci` (Jest 105 tests) | Pass — env validation, auth gate, HTTP adapter (401 refresh/retry + shared singleflight + refresh-failure sign-out), chat errors, digest pin (2026-08-29) |
+| Mobile `test:ci` (Jest 147 tests) | Pass — env validation, auth gate, HTTP adapter (401 refresh/retry + shared singleflight + refresh-failure sign-out), chat errors, digest pin, App Check, Sentry init (2026-09-03) |
 | App config variants (`expo config` eval) | Pass — dev/preview/production identifiers, schemes, fingerprint runtime version; profile/`APP_ENV` mismatches rejected |
 | Mobile `npm audit` | 99 vulnerabilities (9 moderate, 90 high) — see C9 (2026-08-29) |
 | Repository boundary check | Child folders are their own Git top-levels with origin remotes and pushed branches; no tags (2026-08-29) |
@@ -92,7 +95,15 @@ Full review of backend, mobile, and the contract boundary; all fixes applied and
 - **Emulator fail-closed (fixed).** `FirebaseConfig` accepted emulator token verification in any `!local` profile when `firebase.emulator.host` was set (one stray env var on a deployed service = emulator-signed tokens accepted). Now startup fails unless the profile is `dev-local`; `FirebaseConfigTest` covers the prod and dev refusals and the dev-local allowance.
 - **HTTP Basic scoping (fixed).** Basic authenticated every protected route; now a dedicated `/actuator/**` chain requires the admin credential and API routes are Firebase-bearer only (`SecurityConfigTest`: Basic rejected on `/api/v1/me`, accepted on `/actuator/health`).
 - **Mobile auth gaps (fixed).** The query cache now clears on any user change (in-place account switch previously rendered the previous user's cached `/me`/billing), and a failed forced refresh now signs out and clears instead of surfacing a raw Firebase error; the retry reuses the refreshed token instead of re-reading (and clobbering) it.
-- **Register hygiene (this update).** P0#1/#3/#4/#6, P1#3/#8, C6/C7/C9/C10 and the verification/evidence tables brought to current reality.
+- **Register hygiene.** P0#1/#3/#4/#6, P1#3/#8, C6/C7/C9/C10 and the verification/evidence tables brought to current reality.
+
+## 2026-09-03 integrations pass (Sentry + background jobs)
+
+Two opt-in integrations shipped and verified the same day (backend `./mvnw verify` 197 tests; mobile Jest 147 tests, lint/typecheck/contract clean):
+
+- **Sentry error monitoring (done, opt-in).** Backend: `ErrorReporter` port + `SentryErrorReporter` (core SDK, manual `Sentry.init` — the Spring Boot starter's Boot-4 support is unverified) / `NoOpErrorReporter` (local); capture wired into the four 5xx handlers with `correlationId` context; `SentryConfig` fail-closed (enabled requires DSN); `sendDefaultPii=false`, tracing off. Mobile: `@sentry/react-native` (not deprecated `sentry-expo`) + config plugin + opt-in `initSentryIfEnabled` (toggle + DSN, native-only; web excluded at v1), 5 unit tests. Activation (Sentry console org/DSN + DEV 500-smoke) is the pending external step — C14.
+- **Background-jobs capability (done, opt-in).** `starter.jobs.enabled=false` by default — no scheduler exists when disabled; `JobSchedulingConfiguration` gates `@EnableScheduling`; `LocalDemoJob` proves the mechanism under `local` only. Durable path for products = Cloud Scheduler/Tasks → authenticated HTTP job endpoint (in-process `@Scheduled` is not durable on scale-to-zero Cloud Run); runbook `integrations/BACKGROUND_JOBS.md`.
+- **Docs.** `integrations/SENTRY.md` (activation runbook → implemented), `integrations/BACKGROUND_JOBS.md`, `starter-backend/docs/SENTRY_EXTENSION.md`, status rows + decisions in `integrations/README.md` and `docs/integrations-plan.md`.
 
 ## Evidence locations
 
