@@ -28,6 +28,7 @@ buildout history), and the backend/mobile repositories own the implementation do
 | Integration | Status | Runbook |
 |---|---|---|
 | Slack deploy-failure alerts | ✅ optional, backend | [SLACK_ALERTS.md](./SLACK_ALERTS.md) |
+| Background jobs (Cloud Scheduler/Tasks) | 🟡 mechanism shipped (opt-in, off by default); scheduler/tasks activation per app | [BACKGROUND_JOBS.md](./BACKGROUND_JOBS.md) |
 | SonarQube local quality gate | ✅ shared server, per-app project keys | [../shared-infra/sonar/README.md](../shared-infra/sonar/README.md) |
 | Trivy container scan + CodeQL/SBOM | ✅ in CI, no activation | (part of the workflows; see `.github/workflows/`) |
 
