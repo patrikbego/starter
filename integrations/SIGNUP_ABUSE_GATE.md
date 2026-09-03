@@ -49,9 +49,12 @@ provider already ships ([APP_CHECK.md](./APP_CHECK.md)).
 
 Prerequisites, in order:
 
-1. **Wire native App Check first** (`@react-native-firebase/app-check` + Play Integrity/App Attest
-   console registration). Native is stubbed today — it sends no token, so enforcement would break
-   native sign-in. See [APP_CHECK.md · Pending](./APP_CHECK.md#pending--to-do).
+1. **Native App Check — wired in code** (2026: `@react-native-firebase/app-check` + Expo config
+   plugins behind `EXPO_PUBLIC_APP_CHECK_ENABLED`; see
+   [APP_CHECK.md](./APP_CHECK.md#native-mobile-iosandroid--wired-in-code-activation-per-app)).
+   Remaining activation: console app registrations (Play Integrity + SHA-256 / App Attest +
+   DeviceCheck), the gitignored console files at the mobile repo root, and an EAS build + live
+   smoke. Native sent no token before this — enforcement would have broken native sign-in.
 2. App Check registered in both DEV and PROD projects (web + native providers).
 3. Live smoke passes with enforcement OFF (monitor mode), then flip.
 
@@ -64,6 +67,10 @@ Caveats:
 
 - Web App Check (reCAPTCHA Enterprise) is bypassable by headless clients — Phase A raises the bar
   for casual scripters; it is not a full stop.
+- **The JS-SDK auth trap**: on this template, auth runs on the Firebase JS SDK, which attaches App
+  Check tokens to Identity Toolkit calls only from a JS-layer App Check instance. The native
+  adapter ships the bridge (`CustomProvider` -> RNFB `getToken`) so enforcement does not break
+  native auth — this is exactly why the native live smoke is a hard prerequisite for the flip.
 - Keep Cloud Run's own App Check verification untouched: console enforcement governs Firebase
   services only, this Spring API remains its own enforcement point.
 

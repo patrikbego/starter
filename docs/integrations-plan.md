@@ -14,7 +14,7 @@ Status legend: ✅ implemented · 🟡 partial (pattern doc only / pending live 
 | Integration | Status | Where / notes |
 |---|---|---|
 | Firebase Authentication | ✅ | Email/Password; mobile signs in with Firebase Web SDK, backend verifies each ID token with Admin SDK; local mock without network |
-| Firebase App Check | ✅ web / 🟡 native | Backend verifies `X-Firebase-AppCheck` (manual RS256 JWT/JWKS — the Java Admin SDK has no verifyToken API); filter requires a valid token on `/api/v1/ai/chat` when enabled (default off, PROD-on); web provider ships, native (Play Integrity/App Attest) stubbed. Local mock via `MockAppCheckVerifier` |
+| Firebase App Check | ✅ web / 🟡 native wired in code (opt-in; console registration + EAS live smoke pending) | Backend verifies `X-Firebase-AppCheck` (manual RS256 JWT/JWKS — the Java Admin SDK has no verifyToken API); filter requires a valid token on `/api/v1/ai/chat` when enabled (default off, PROD-on); web provider ships; native = `@react-native-firebase/app-check` 23.8.8 + JS bridge for the JS-SDK auth path. Local mock via `MockAppCheckVerifier` |
 | Firestore (database) | ✅ | Repository-port boundary; provisioned by Terraform; `local` uses in-memory repo |
 | AI chat (OpenRouter) | ✅ | Spring AI behind `AiChatPort`; fail-closed; per-user quota + rate limit (429/Retry-After), input cap, provider timeout, outcome-only metrics |
 | Stripe billing | ✅ opt-in | `BillingPort`/`StripeBillingAdapter`; checkout + portal + webhook (only Firebase-exempt route); `stripe-java` already in pom |

@@ -1,10 +1,12 @@
 # APP_CHECK.md — Firebase App Check per Product App
 
-**Status: implemented (web) in both templates; native providers stubbed.** App Check proves a
+**Status: implemented (web); native wired in code, activation still per-app.** App Check proves a
 request comes from a *genuine build of your app*, not curl/a scraper. It is NOT authentication —
 identity stays the Firebase ID token. The backend *requires* a valid App Check token on the public
 AI endpoint (`/api/v1/ai/chat`) when enabled, and *verifies when present* on other protected
-routes.
+routes. Web uses the Firebase JS SDK (reCAPTCHA Enterprise); native uses
+`@react-native-firebase/app-check` (Play Integrity / App Attest), pulled in only when the opt-in
+toggle is on. Console registration + an EAS-build live smoke are the remaining activation steps.
 
 Implementation lives in `starter-backend` (JWT/JWKS verification) and `starter-mobile` (web
 provider + header). See "[Pending / to-do](#pending--to-do)" below for what remains.
@@ -23,12 +25,15 @@ signature, `aud`, `iss`, `exp`.
 
 Not fully rolled out — the template ships the mechanism, but activation needs user + follow-up work:
 
-- **Native mobile (iOS/Android) is not wired.** `createFirebaseAppCheckAdapter` returns `null` on
-  native, so native devices send no App Check token. Adding Play Integrity / App Attest requires
-  the `@react-native-firebase/app-check` module + its Expo config plugin + per-app console
-  registration — a deliberate, EAS-build-verified follow-up. **This also gates Phase A of the
-  sign-up abuse gate** (App Check enforcement on Identity Platform would break native sign-in
-  until native tokens exist) — see [SIGNUP_ABUSE_GATE.md](./SIGNUP_ABUSE_GATE.md).
+- **Native mobile is wired in code** (`@react-native-firebase/app` + `@react-native-firebase/app-check`
+  v23.8.8 + their Expo config plugins, included **only when** `EXPO_PUBLIC_APP_CHECK_ENABLED=true`,
+  so default builds stay JS-SDK-only). Activation still needs, per app + env: console app
+  registrations (Android: Play Integrity + signing-cert SHA-256; iOS: App Attest + DeviceCheck),
+  the two console files dropped at the mobile repo root (`google-services.json`,
+  `GoogleService-Info.plist` - gitignored, fail-closed at prebuild), optionally
+  `EXPO_PUBLIC_APP_CHECK_DEBUG_TOKEN` for the debug provider in non-production, and an EAS build +
+  live smoke before any enforcement flip. **This gates Phase A of the sign-up abuse gate**
+  ([SIGNUP_ABUSE_GATE.md](./SIGNUP_ABUSE_GATE.md)).
 - **Console provisioning is manual** (see below) — Get started + app registration in both DEV and
   PROD Firebase projects; no API creates it.
 - **Enforcement is off by default.** Flip the **repo variables** on the backend repository
@@ -85,14 +90,35 @@ starter:
   **only when the toggle is on** (`envValidation.ts` + `app.config.ts` fail otherwise). The site key
   comes from `EXPO_PUBLIC_RECAPTCHA_ENTERPRISE_SITE_KEY` (verbatim in `app.config.ts` → `extra`).
 
-## Native mobile (iOS/Android) — NOT yet wired
+## Native mobile (iOS/Android) — wired in code, activation per app
 
-Play Integrity (Android) / App Attest (iOS, DeviceCheck fallback) need the native
-`@react-native-firebase/app-check` module plus its Expo config plugin and per-app console
-registration — see [Pending / to-do](#pending--to-do). Until it lands,
-`createFirebaseAppCheckAdapter` returns `null` on native (no header sent), which the backend
-accepts except where it is required. **Enable on PROD only after a native build + live smoke**
-verifies Play Integrity/App Attest round-trips, and after the console provider registration below.
+| Piece | Path |
+|---|---|
+| Native adapter (RNFB tokens + JS bridge) | [`src/adapters/FirebaseAppCheckNativeAdapter.ts`](../starter-mobile/src/adapters/FirebaseAppCheckNativeAdapter.ts) |
+| Factory (web/native/dispatch) | [`src/adapters/FirebaseAppCheckAdapter.ts`](../starter-mobile/src/adapters/FirebaseAppCheckAdapter.ts) |
+| Debug token config | `EXPO_PUBLIC_APP_CHECK_DEBUG_TOKEN` (`.env.example`, `app.config.ts` -> `extra`) |
+
+The native adapter is built on `@react-native-firebase/app` + `@react-native-firebase/app-check`
+(pinned 23.8.8, the line matching Expo SDK 54 / RN 0.81). Both packages and their Expo config
+plugins enter the build **only when `EXPO_PUBLIC_APP_CHECK_ENABLED=true`**; the core plugin then
+requires the console files at the mobile repo root (`google-services.json`,
+`GoogleService-Info.plist`, both gitignored, fail-closed at prebuild) and wires
+`FirebaseApp.configure()`.
+
+Two App Check layers exist on native, and both are needed:
+
+1. **RNFB (native)** mints tokens via Play Integrity (Android) / App Attest with DeviceCheck
+   fallback (iOS). Non-production builds use the `debug` provider (optionally with
+   `EXPO_PUBLIC_APP_CHECK_DEBUG_TOKEN`, registered in the Firebase console for
+   CI/simulator use). These tokens feed the `X-Firebase-AppCheck` header to the backend.
+2. **JS bridge**: the app's auth runs on the Firebase JS SDK, which attaches App Check tokens to
+   Identity Toolkit calls (sign-up/sign-in/reset) only from a JS-layer instance. The adapter
+   initializes `firebase/app-check` with a `CustomProvider` delegating to RNFB. Without this
+   bridge, Phase A enforcement ([SIGNUP_ABUSE_GATE.md](./SIGNUP_ABUSE_GATE.md)) would reject every
+   auth call on native even though native mints valid tokens.
+
+**Enable on PROD only after an EAS native build + live smoke** verifies the Play Integrity /
+App Attest round-trips and the console provider registrations below.
 
 ## Console provisioning (per environment project) — user action
 
@@ -101,7 +127,9 @@ Same console-only bootstrap nature as Auth (no API creates it):
 1. **Build → App Check → Get started** once, in both `*-dev` and `*-prod` Firebase projects.
 2. Register apps per project: Android (Play Integrity, needs signing-cert SHA-256), iOS (App
    Attest + DeviceCheck), Web (reCAPTCHA Enterprise site key, created in Google Cloud console and
-   linked).
+   linked). Native App Check additionally needs the per-project console files dropped at the
+   mobile repo root (`google-services.json`, `GoogleService-Info.plist`; gitignored) and, for
+   non-production, a debug token registered under App Check > Apps > Manage debug tokens.
 3. **Keep enforcement OFF** in the console — this backend is the enforcement point (console
    enforcement only governs Firebase services, not this Spring API). **One exception:** App Check
    enforcement on **Identity Platform** (Auth sign-up/sign-in/reset) is Phase A of the sign-up
@@ -120,6 +148,8 @@ Same console-only bootstrap nature as Auth (no API creates it):
    untouched. Cryptography is unit-covered by `JwksAppCheckVerifierTest`; fail-closed config by
    `AppCheckConfigTest`.
 2. Mobile `npm run validate:contract` (re-pinned digest), `npm run lint`, `npx tsc --noEmit`, `npm test`.
+   Native adapter is unit-covered by `FirebaseAppCheckNativeAdapter.test.ts` (provider selection,
+   JS bridge delegation, failure-returns-null; RNFB modules mocked).
 3. **Browser E2E** (`npm run test:e2e:app-check`, dispatch-only — excluded from the PR gate,
    self-skips unless `E2E_APP_CHECK=1` + verified creds): exported web bundle mints a real
    reCAPTCHA Enterprise token → asserts the `X-Firebase-AppCheck` header on the outgoing chat
@@ -128,6 +158,11 @@ Same console-only bootstrap nature as Auth (no API creates it):
    enforcement there. Prereqs: console provisioning + site key +
    `APP_CHECK_ENABLED_DEV/PROD=true` repo variables + bundle exported with the site key (see
    Pending / to-do).
+4. **Native smoke** (gates the sign-up gate's Phase A flip): EAS preview build with
+   `EXPO_PUBLIC_APP_CHECK_ENABLED=true` + console files + registered debug token → sign-in on a
+   real device → the request carries a valid `X-Firebase-AppCheck` (backend accepted a
+   required-token route). This proves the RNFB + JS-bridge stack end to end; unit tests alone
+   cannot (verified against SDK contracts, not a live attestation).
 
 ## Cost
 

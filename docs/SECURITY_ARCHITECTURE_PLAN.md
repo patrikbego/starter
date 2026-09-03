@@ -61,7 +61,7 @@ Decisions that shape everything else:
 | # | Now item | Status |
 |---|---|---|
 | 1 | Firestore deny-all rules + IAM | ✅ rules file, `firebase.json` wiring, deploy script added; IAM already least-privilege. Deploying rules = Phase 5/6 |
-| 2 | App Check (client + backend verify) | ✅ done (web; native stubbed) — backend verifies RS256 JWT/JWKS manually (the Java Admin SDK has no AppCheck API, so no SDK bump unlocks it); requires a valid token on `/api/v1/ai/chat` when enabled (default off, PROD-on); web provider shipped. Live smoke = Phase 5/6 |
+| 2 | App Check (client + backend verify) | ✅ done (web) / 🟡 native wired in code (opt-in, pending console registration + EAS live smoke) — backend verifies RS256 JWT/JWKS manually (the Java Admin SDK has no AppCheck API, so no SDK bump unlocks it); requires a valid token on `/api/v1/ai/chat` when enabled (default off, PROD-on); web provider shipped; native = `@react-native-firebase/app-check` behind the same toggle |
 | 3 | Cloud Run cost containment | ✅ `min=0` / `concurrency` encoded in deploy workflows; `max-instances` = attack budget. Live application = Phase 5/6 |
 | 4 | AI cost controls | ✅ kill-switch `AI_ENABLED` added; quota/caps/timeout already baseline. Budgets-as-code added to `infra/` + `COST_CONTROLS.md` runbook; live apply/wiring = Phase 5/6 |
 | 5 | Firebase Hosting web + CORS/headers | ⛔ blocked on Phase 5/6 (deployment) |
@@ -80,8 +80,9 @@ Decisions that shape everything else:
 - **App Check** (client init + Spring `verifyToken`): **implemented** — because the Java Admin
   SDK has no `AppCheck.verifyToken` (verified in `firebase-admin:9.10.0`), the backend verifies
   the RS256 token manually against the project's public keys (Nimbus JWT/JWKS). Web provider
-  shipped; native (Play Integrity / App Attest) stubbed pending the native module + console
-  registration. Enforcement off by default, PROD-on after a live smoke.
+  shipped; native is wired in code (`@react-native-firebase/app-check` behind the opt-in toggle)
+  pending console registration + EAS live smoke. Enforcement off by default, PROD-on after a
+  live smoke.
 - **Firebase Hosting** web app + CORS origin + security headers on the served app.
 - **Budget/spend alerts applied**: the budget resources (50/90/100% + forecast, Pub/Sub + optional email) are written in `infra/main.tf` but only materialize once `billing_account_id` is set in the tfvars and `terraform apply` runs against the live billing account; automating the stop actions (Pub/Sub → Cloud Function) is also Phase 5/6.
 - **Sign-up abuse gate**: phased A→C→B per [integrations/SIGNUP_ABUSE_GATE.md](../integrations/SIGNUP_ABUSE_GATE.md) — Phase A (App Check enforcement on Identity Platform) is console-only but requires native App Check wiring; Phase C (reCAPTCHA assessment on Spring-mediated sign-up) is the v1 target; Phase B (blocking functions) is evidence-triggered. Full plan verified against live Firebase/Google docs; the old "blocking functions + reCAPTCHA" single-mechanism reading was wrong — a `beforeUserCreated` event carries no reCAPTCHA token channel.

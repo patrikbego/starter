@@ -66,7 +66,7 @@ The core question of this guide. Same computer, same accounts:
 | OpenRouter account | ✅ reuse | **create a new API key per app** — per-app spend tracking; feed it to that app's Secret Manager only. Key click-path + traps: [`integrations/OPENROUTER_AI.md`](../integrations/OPENROUTER_AI.md) |
 | Stripe account (optional billing) | ✅ reuse account | **per app/env**: new product + price, new webhook endpoint, new API key + signing secret (test mode first, live for PROD). Full runbook: [`integrations/STRIPE.md`](../integrations/STRIPE.md) |
 | Firebase | ❌ new | new project per app (DEV + PROD), new Web-app registration per project, new test users; never point an app's prod binary at another app's Firebase. Runbook: [`integrations/FIREBASE_AUTH.md`](../integrations/FIREBASE_AUTH.md) |
-| App Check (optional, off by default) | ❌ new per app+env | enable per console (both DEV/PROD projects) + link a reCAPTCHA Enterprise web key; set backend repo vars `APP_CHECK_ENABLED_DEV/PROD` + `APP_CHECK_PROJECT_NUMBER_DEV/PROD`, mobile `EXPO_PUBLIC_RECAPTCHA_ENTERPRISE_SITE_KEY`. Runbook: [`integrations/APP_CHECK.md`](../integrations/APP_CHECK.md) |
+| App Check (optional, off by default) | ❌ new per app+env | enable per console (both DEV/PROD projects) + link a reCAPTCHA Enterprise web key; for native: register Android (Play Integrity + SHA-256) and iOS (App Attest + DeviceCheck) apps and drop `google-services.json` / `GoogleService-Info.plist` at the mobile repo root; set backend repo vars `APP_CHECK_ENABLED_DEV/PROD` + `APP_CHECK_PROJECT_NUMBER_DEV/PROD`, mobile `EXPO_PUBLIC_RECAPTCHA_ENTERPRISE_SITE_KEY`. Native needs an EAS build + live smoke before any enforcement flip. Runbook: [`integrations/APP_CHECK.md`](../integrations/APP_CHECK.md) |
 | Play Console ($25 once) | ✅ account fee is one-time | new app entry per Android app + its own signing/upload key flow |
 | Sonar (localhost:9000) | ✅ reuse server | new project keys; run `local-gate.sh <new-key>` |
 | `FIREBASE_WEB_API_KEY` + `FIREBASE_TEST_USER_EMAIL/_PASSWORD` (optional auth smoke, future E2E) | ❌ new values | from THIS app's DEV Firebase project; same secret names as the template. Click-paths: [`integrations/FIREBASE_AUTH.md`](../integrations/FIREBASE_AUTH.md) |
@@ -154,9 +154,12 @@ The core question of this guide. Same computer, same accounts:
       webhook endpoint, two new Secret Manager secrets, four `--set-env-vars` additions. The
       extension stays `503 BILLING_DISABLED` until `BILLING_ENABLED=true`.
 - [ ] **Optional — App Check** (client attestation; off by default): console Get started in both
-      Firebase projects + link a reCAPTCHA Enterprise web key; set backend repo vars
-      `APP_CHECK_ENABLED_DEV` + `APP_CHECK_PROJECT_NUMBER_DEV` (gate DEV smoke), then the `_PROD`
-      pair after the smoke passes. Runbook: [`integrations/APP_CHECK.md`](../integrations/APP_CHECK.md).
+      Firebase projects + link a reCAPTCHA Enterprise web key; for native, register the Android/iOS
+      apps (Play Integrity + SHA-256 / App Attest + DeviceCheck) and drop the console files
+      (`google-services.json`, `GoogleService-Info.plist`) at the mobile repo root; set backend
+      repo vars `APP_CHECK_ENABLED_DEV` + `APP_CHECK_PROJECT_NUMBER_DEV` (gate DEV smoke), then
+      the `_PROD` pair after the smoke passes. Runbook:
+      [`integrations/APP_CHECK.md`](../integrations/APP_CHECK.md).
 - [ ] Trigger **Deploy to DEV** → chain green (`verify → build-and-push → deploy-dev → smoke-dev`),
       `/health/*` 200, unauth `/api/v1/me` 401. Copy the DEV URL — the mobile repo needs it.
 - [ ] PROD mirror: `prod.tfvars` → plan/apply prod → `_PROD` secrets → **two** cross-project
