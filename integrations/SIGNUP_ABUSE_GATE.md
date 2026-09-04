@@ -126,6 +126,10 @@ adoption implemented for web** (native deliberately stays client-direct — see 
   by `FirebaseAuthServiceImpl`; `MockAccountCreator` under `local`). Passwords and tokens never
   logged. Env: `RECAPTCHA_ENABLED`, `RECAPTCHA_PROJECT_ID`, `RECAPTCHA_SITE_KEY`,
   `RECAPTCHA_API_KEY` (Secret Manager), `RECAPTCHA_EXPECTED_ACTION`, `RECAPTCHA_MIN_SCORE`.
+- ✅ **Prereq (incident 2026-09-04)**: the backend runtime SA (`starter-api@…`) needs
+  `roles/firebaseauth.admin` or Admin-SDK `createUser` returns `ACCOUNT_PROVIDER_ERROR` (502)
+  and every sign-up fails. Was missing in DEV → sign-ups red → e2e register red. Granted
+  manually; codified in `starter-backend/infra/main.tf` (`api_runtime` roles).
 - ✅ **Mobile adoption (web)**: `AuthProvider.signUp` on web = mint reCAPTCHA Enterprise token
   (`RecaptchaEnterpriseWebToken` — lazy script load, best-effort: mint failure still calls the
   route, the backend owns the policy) → `POST /api/v1/auth/sign-up` (`authenticated: false`;
