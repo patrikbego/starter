@@ -81,7 +81,7 @@ adapter house pattern exactly (port + `RestClient` adapter + fail-closed config 
 same shape as `EmailPort`).
 
 Status: **backend implemented** (2026-09: route in the contract, gate default-off); **mobile
-adoption open** (see caveat below).
+adoption implemented for web** (native deliberately stays client-direct — see below).
 
 - ✅ **Contract**: `POST /api/v1/auth/sign-up` in `starter-backend/openapi.yaml`
   `{email, password, recaptchaToken?}` → `201 {uid}`; `403 RECAPTCHA_INVALID`, `409 EMAIL_EXISTS`,
@@ -95,11 +95,18 @@ adoption open** (see caveat below).
   by `FirebaseAuthServiceImpl`; `MockAccountCreator` under `local`). Passwords and tokens never
   logged. Env: `RECAPTCHA_ENABLED`, `RECAPTCHA_PROJECT_ID`, `RECAPTCHA_SITE_KEY`,
   `RECAPTCHA_API_KEY` (Secret Manager), `RECAPTCHA_EXPECTED_ACTION`, `RECAPTCHA_MIN_SCORE`.
-- ⬜ **Mobile adoption**: `AuthPort.signUp` still uses client-direct
-  `createUserWithEmailAndPassword`. Switching it needs (a) web reCAPTCHA Enterprise token minting
-  for the `sign-up` action, and (b) a native decision — native has no reCAPTCHA assessment SDK
-  wired; **native stays on Phase A** (App Check enforcement) until a product needs per-attempt
-  scoring there. Sequence after switching: create via API → then sign in (no auto-session).
+- ✅ **Mobile adoption (web)**: `AuthProvider.signUp` on web = mint reCAPTCHA Enterprise token
+  (`RecaptchaEnterpriseWebToken` — lazy script load, best-effort: mint failure still calls the
+  route, the backend owns the policy) → `POST /api/v1/auth/sign-up` (`authenticated: false`;
+  App Check header attached when available) → `signIn` (Admin SDK `createUser` creates no
+  session). Gate errors surface via the standard envelope (`403 RECAPTCHA_INVALID`,
+  `409 EMAIL_EXISTS`, `502 RECAPTCHA_PROVIDER_ERROR`). `HttpApiClient` now attaches the App Check
+  header on **unauthenticated** requests too — the route requires it when App Check is enabled.
+  Deploy sequencing: web sign-up needs a backend built after `cee2e43`; older DEV backends 404.
+- ⬜ **Native stays client-direct (decision)**: native is protected by Phase A (App Check
+  enforcement on Identity Platform) and has no reCAPTCHA assessment SDK — routing native through
+  the API would only produce a blank token the gate rejects. Revisit only if a product needs
+  per-attempt scoring on native.
 - ✅ **Email verification** stays Firebase-native and unaffected.
 
 Estimate ~1 day of code — the plan's number applies to this phase, not to the whole gate.
