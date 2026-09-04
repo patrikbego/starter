@@ -6,6 +6,11 @@ Work top-to-bottom; decisions below are resolved.
 Companion to [`STEP5_FIRST_PUSH_CHECKLIST.md`](../guides/STEP5_FIRST_PUSH_CHECKLIST.md) (§5 CI path is
 green; this adds the automated-E2E layer on top of it).
 
+> **2026-09-04:** the same suite is now also the **deploy gate for the hosted web app**
+> (`deploy-web.yml` runs it before updating Firebase Hosting — fail closed). The e2e still runs
+> on CI-local `localhost:8081`; the permanent public URL it protects is
+> `https://starter-demo-dev.web.app` — see [FIREBASE_HOSTING.md](./FIREBASE_HOSTING.md).
+
 ## Goal
 
 Prove, on every PR, that the real UI drives the real stack: **register → `me` → sign-out →

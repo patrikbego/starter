@@ -6,6 +6,33 @@ site only goes live when e2e is green against the exact exported bundle). This i
 "where's the frontend link?":
 [`https://starter-demo-dev.web.app`](https://starter-demo-dev.web.app).
 
+## Try it — live DEV app (links + credentials)
+
+| What | Link |
+|---|---|
+| Web app (DEV) | https://starter-demo-dev.web.app (also https://starter-demo-dev.firebaseapp.com) |
+| Backend API (DEV) | https://starter-api-dev-906316354955.europe-west2.run.app |
+| Liveness probe | https://starter-api-dev-906316354955.europe-west2.run.app/health/live |
+| Cloud Run console | https://console.cloud.google.com/run?project=starter-demo-dev |
+| Firebase console | https://console.firebase.google.com/project/starter-demo-dev/overview |
+
+**Demo login (DEV test user):**
+
+```text
+email:    demo@starter-demo-dev.com
+password: StarterDemo!2026
+```
+
+- This is a throwaway DEV account with `emailVerified=true` (so the AI chat round-trip works —
+  the backend gates `POST /api/v1/ai/chat` on the verified claim). Created 2026-09-04 via
+  Firebase Auth + Admin SDK.
+- It is a **test credential, not a secret** (DEV project only; no same-password reuse anywhere
+  in PROD). Recreate it any time with the steps in [FIREBASE_AUTH.md](./FIREBASE_AUTH.md) +
+  an Admin-SDK `updateUser(emailVerified: true)` call, or just register a fresh user on the
+  site (sign-up is self-service in DEV).
+- The API root returns `401 {"code":"UNAUTHORIZED",…}` for unauthenticated requests — that is
+  expected, not a bug. Sign in on the web app first.
+
 ## What this adds vs the e2e flow
 
 | | Browser e2e (`web-e2e.yml`) | Hosted web (`deploy-web.yml`) |
@@ -75,3 +102,13 @@ run `npm run deploy:web` locally.
 - No custom domain, no `firebase.json` `headers`/`redirects` beyond the SPA rewrite.
 - No PROD hosting site yet (`starter-demo-prod` untouched) — add one when the prod pipeline ships.
 - No CDN cache tuning; defaults are fine for a dev prototype.
+
+## Incident log
+
+- **2026-09-04 — web sign-ups returned `502 ACCOUNT_PROVIDER_ERROR`** (fresh register in the
+  browser e2e and on the hosted site both failed; the deploy gate went red, correctly). Root
+  cause: the backend runtime SA `starter-api@…` lacked `roles/firebaseauth.admin`, so the
+  Admin-SDK `createUser` behind `POST /api/v1/auth/sign-up` failed. Fixed by granting the role;
+  codified in `starter-backend/infra/main.tf` and recorded in
+  [SIGNUP_ABUSE_GATE.md](./SIGNUP_ABUSE_GATE.md). Re-ran the full e2e suite (8 pass) and
+  verified a fresh live-site sign-up before reopening the gate.
