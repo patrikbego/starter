@@ -206,7 +206,11 @@ The core question of this guide. Same computer, same accounts:
       `EXPO_PUBLIC_RECAPTCHA_ENTERPRISE_SITE_KEY` follows the same dual-location rule (App Check —
       optional, off by default, see [`integrations/APP_CHECK.md`](../integrations/APP_CHECK.md);
       `EXPO_PUBLIC_APP_CHECK_ENABLED` flips it on (absent/false = off; the toggle also controls
-      whether PROD builds demand the site key);
+      whether PROD builds demand the site key). **This flag is pre-baked `true` in `eas.json`
+      `preview` and `production` profiles** — keep it there: EAS builds do not reliably inherit
+      shell env, and stripping it makes the first Identity Platform enforcement flip break native
+      auth. The `development` profile stays off. Apps derived before this change must port the
+      two-line `eas.json` diff manually (`eas.json` is app-owned, see UPSTREAM_SYNC);
       (2) name projects to respect the env guards (`src/config/envValidation.ts:31`): a PROD
       build fails if `EXPO_PUBLIC_FIREBASE_PROJECT_ID` matches `-dev([.-]|$)`; DEV/preview builds
       fail on `-prod` ids. Keep dev/prod Firebase ids unambiguous.

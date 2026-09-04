@@ -91,7 +91,7 @@ Use EAS environments so the same public variable names resolve to environment-sp
 | `EXPO_PUBLIC_FIREBASE_API_KEY` | DEV Firebase value | PROD Firebase value |
 | `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN` | DEV domain | PROD domain |
 | `EXPO_PUBLIC_FIREBASE_PROJECT_ID` | `{app}-dev` | `{app}-prod` |
-| `EXPO_PUBLIC_APP_CHECK_ENABLED` | `false` (default) | `false` — set `true` only when the product enables App Check |
+| `EXPO_PUBLIC_APP_CHECK_ENABLED` | `false` in `.env`/local; **baked `true` in `eas.json` `preview`** (smoke profile) | **Baked `true` in `eas.json` `production`** — do not strip; App Check enforcement on Identity Platform would otherwise break native auth at the flip |
 | `EXPO_PUBLIC_RECAPTCHA_ENTERPRISE_SITE_KEY` | DEV site key (needed only when the toggle is on; test key OK for the DEV E2E smoke) | PROD site key — **required only when the toggle is on** (`envValidation` fails otherwise) |
 | `EAS_PROJECT_ID` | Product EAS project | Same product EAS project |
 

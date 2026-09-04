@@ -163,6 +163,8 @@ Same console-only bootstrap nature as Auth (no API creates it):
    real device → the request carries a valid `X-Firebase-AppCheck` (backend accepted a
    required-token route). This proves the RNFB + JS-bridge stack end to end; unit tests alone
    cannot (verified against SDK contracts, not a live attestation).
+   The flag is **pre-baked `true` in `eas.json` `preview` and `production`** (the `development`
+   profile stays off) — pass nothing on the command line; just don't strip it from the profiles.
 
 ## Cost
 

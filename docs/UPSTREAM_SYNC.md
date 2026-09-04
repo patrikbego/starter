@@ -56,7 +56,7 @@ everywhere; do not fork logic app-side.
 | Platform code (auth, AI, billing, storage, error envelope, config) | template | No — improvements go into the starter first, then flow down via sync |
 | `openapi/openapi.yaml` | app | Yes — this IS the app's contract; template contract additions merge in cleanly while changes stay additive within `/api/v1` |
 | `infra/dev.tfvars`, `infra/prod.tfvars` | app | Yes — app identity (project ids, artifact repo, service names) |
-| `app.config.ts`, `eas.json`, `package.json` (mobile) | app | Yes — app identity |
+| `app.config.ts`, `eas.json`, `package.json` (mobile) | app | Yes — app identity. Exception: template-level `eas.json` env changes that gate platform behavior (e.g. the `EXPO_PUBLIC_APP_CHECK_ENABLED` baking for `preview`/`production`, 2026) must be **ported deliberately** to existing apps — stripping them silently disables App Check and breaks native auth at enforcement flips |
 | Product domain/application code, feature modules | app | Yes — keep it in clearly separated packages/dirs |
 | Docs and README | both | App sections yes; template-owned sections minimized |
 
