@@ -22,6 +22,7 @@ buildout history), and the backend/mobile repositories own the implementation do
 | Sentry error/crash monitoring | ✅ implemented, opt-in (backend + native mobile; web at v1) | [SENTRY.md](./SENTRY.md) | [starter-backend/docs/SENTRY_EXTENSION.md](../starter-backend/docs/SENTRY_EXTENSION.md) · mobile `src/telemetry/sentry.ts` |
 | GCS file storage (signed-URL uploads) | 🟡 pattern doc only | (see implementation doc) | [starter-backend/docs/STORAGE_EXTENSION.md](../starter-backend/docs/STORAGE_EXTENSION.md) |
 | Playwright browser E2E vs DEV backend | ✅ P0–P4 implemented | [BROWSER_E2E.md](./BROWSER_E2E.md) | — |
+| Firebase Hosting (permanent web URL) | ✅ implemented (DEV) | [FIREBASE_HOSTING.md](./FIREBASE_HOSTING.md) | — |
 | Mailtrap email sandbox (auth-email capture for E2E) | ✅ code + runbook ready, relay + API token active on DEV; **spec is manual-run only, excluded from the PR gate** (quota-sensitive) | [MAILTRAP.md](./MAILTRAP.md) | — |
 
 ## Operational integrations
