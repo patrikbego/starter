@@ -1,9 +1,10 @@
 # SIGNUP_ABUSE_GATE.md — Sign-up abuse gate (per Product App)
 
-**Status: plan + runbook ready; no code yet.** Per-uid AI quotas are the strongest abuse control
-in this architecture — but only as strong as account creation being hard to automate. Sign-up is
-client-direct today (mobile → Firebase, Spring never sees it), so an attacker mints free uids and
-rotates past every quota.
+**Status: A + C implemented in code; activation (console + builds) per-app.** Per-uid AI quotas
+are the strongest abuse control in this architecture — but only as strong as account creation
+being hard to automate. Sign-up is client-direct on native (mobile → Firebase, Spring never sees
+it) and Spring-mediated on web, so an attacker minting free uids rotates past every quota unless
+A is enforced.
 
 **The one architectural fact that shapes everything:** a `beforeUserCreated` blocking function
 **cannot** run a reCAPTCHA Enterprise assessment — the event carries no client token channel, and
@@ -52,11 +53,41 @@ Prerequisites, in order:
 1. **Native App Check — wired in code** (2026: `@react-native-firebase/app-check` + Expo config
    plugins behind `EXPO_PUBLIC_APP_CHECK_ENABLED`; see
    [APP_CHECK.md](./APP_CHECK.md#native-mobile-iosandroid--wired-in-code-activation-per-app)).
-   Remaining activation: console app registrations (Play Integrity + SHA-256 / App Attest +
-   DeviceCheck), the gitignored console files at the mobile repo root, and an EAS build + live
-   smoke. Native sent no token before this — enforcement would have broken native sign-in.
-2. App Check registered in both DEV and PROD projects (web + native providers).
+   `eas.json` now bakes `EXPO_PUBLIC_APP_CHECK_ENABLED=true` into the `preview` (smoke) and
+   `production` profiles — EAS builds do not inherit shell env, so a profile without it would
+   silently build with App Check off and the first PROD enforcement flip would break native auth.
+   Native sent no token before this — enforcement would have broken native sign-in.
+2. App Check registered in both DEV and PROD projects (web + native providers) — console steps in
+   [APP_CHECK.md §Console provisioning](./APP_CHECK.md#console-provisioning-per-environment-project--user-action).
 3. Live smoke passes with enforcement OFF (monitor mode), then flip.
+
+### Activation checklist (per environment project; console + builds are user actions)
+
+1. **Console files**: place `google-services.json` / `GoogleService-Info.plist` (gitignored) at
+   the mobile repo root — downloads from Firebase console after registering the Android
+   (package id + SHA-256) and iOS (bundle id) apps.
+2. **Register App Check apps** (per project): Android → Play Integrity; iOS → App Attest +
+   DeviceCheck fallback; Web → reCAPTCHA Enterprise v3 site key (same key the assessment uses).
+3. **EAS preview build** (Android first — no Apple credentials needed):
+   `eas build --profile preview --platform android`. `APP_ENV=development` in that profile selects
+   the **debug** providers. First launch prints the debug token to logcat
+   (`adb logcat | grep -i appcheck`) / Xcode console — register it under
+   **App Check → Apps → Manage debug tokens** (or pin it up front via
+   `eas secret:create --name EXPO_PUBLIC_APP_CHECK_DEBUG_TOKEN --value <token>`).
+4. **Native smoke** (monitor mode, enforcement OFF): install the preview build on a real device,
+   sign in with a test user → the Identity Toolkit call carries a valid token → the backend
+   (App Check ON in DEV) accepts a required-token route. Success = the JS-SDK bridge works; this
+   is the hard gate for the flip.
+5. **Flip, DEV first**: **Build → App Check → Enforcement → Identity Platform → Enforced**
+   (existence verified; exact wording may differ). Then verify scripted rejection:
+   `curl -X POST 'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=<DEV apiKey>' -H 'Content-Type: application/json' -d '{"email":"a@b.co","password":"secret123"}'`
+   → must now fail with an App Check error (it succeeded before the flip).
+6. **Post-flip smoke**: repeat 4 (sign-in, sign-up via web, password reset) on preview build +
+   web bundle → then repeat 3–6 for the PROD project with a `production` build (real providers:
+   Play Integrity / App Attest — no debug tokens).
+7. **Rollback** = same toggle back to Off/monitor — takes seconds, no deploy involved. Keep old
+   installed clients in mind: any binary built before the App Check env landed sends no token and
+   **breaks at the flip** — this is a force-upgrade window, not a graceful deprecation.
 
 Console click-path (verify exact wording at activation — existence of the toggle is verified, the
 click-path wording is inferred): **Build → App Check → Enforcement → Identity Platform →
