@@ -20,6 +20,7 @@ buildout history), and the backend/mobile repositories own the implementation do
 | Resend transactional email | ✅ implemented, opt-in | [RESEND.md](./RESEND.md) | [starter-backend/docs/EMAIL_EXTENSION.md](../starter-backend/docs/EMAIL_EXTENSION.md) |
 | Push notifications (Expo/FCM/APNs) | ✅ implemented, opt-in | [PUSH.md](./PUSH.md) | [starter-backend/docs/PUSH_EXTENSION.md](../starter-backend/docs/PUSH_EXTENSION.md) |
 | Sentry error/crash monitoring | ✅ implemented, opt-in (backend + native mobile; web at v1) | [SENTRY.md](./SENTRY.md) | [starter-backend/docs/SENTRY_EXTENSION.md](../starter-backend/docs/SENTRY_EXTENSION.md) · mobile `src/telemetry/sentry.ts` |
+| PostHog analytics + feature flags | ✅ implemented, opt-in (backend local evaluation + AI kill-switch; mobile analytics, web included) | [POSTHOG.md](./POSTHOG.md) | [starter-backend/docs/FEATURE_FLAGS.md](../starter-backend/docs/FEATURE_FLAGS.md) · mobile `src/telemetry/posthog.ts` |
 | GCS file storage (signed-URL uploads) | 🟡 pattern doc only | (see implementation doc) | [starter-backend/docs/STORAGE_EXTENSION.md](../starter-backend/docs/STORAGE_EXTENSION.md) |
 | Playwright browser E2E vs DEV backend | ✅ P0–P4 implemented | [BROWSER_E2E.md](./BROWSER_E2E.md) | — |
 | Firebase Hosting (permanent web URL) | ✅ implemented (DEV) | [FIREBASE_HOSTING.md](./FIREBASE_HOSTING.md) | — |

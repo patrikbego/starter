@@ -21,6 +21,7 @@ Status legend: ✅ implemented · 🟡 partial (pattern doc only / pending live 
 | Resend transactional email | ✅ opt-in | `EmailPort`/`ResendEmailAdapter` (RestClient, no SDK); fail-closed `EmailConfig`; `MockEmailAdapter` in `local`; welcome email on signup |
 | Push notifications | ✅ opt-in | `PushPort`/`PushTokenPort` + Expo adapter (FCM/APNs); `MockPushAdapter` + in-memory token repo in `local` |
 | Error/crash monitoring (Sentry) | ✅ opt-in | backend `ErrorReporter` port + `SentryErrorReporter` (core SDK, manual init — Boot-4 starter unverified) / `NoOpErrorReporter` (local), 5xx handlers capture; mobile `@sentry/react-native` native-only (web excluded at v1) |
+| Analytics + feature flags (PostHog) | ✅ opt-in | backend `FeatureFlagPort` + `PostHogFlagAdapter` (RestClient local evaluation, no SDK) + AI kill-switch flag `ai-chat-enabled` (non-breaking: static config wins, flag only kills); mobile `AnalyticsPort` + PostHog adapter, web included, no fingerprint change. Runbook: [`POSTHOG.md`](../integrations/POSTHOG.md); backend doc: [`FEATURE_FLAGS.md`](../starter-backend/docs/FEATURE_FLAGS.md) |
 | Background jobs (Cloud Scheduler/Tasks) | ✅ opt-in (mechanism) | `starter.jobs` off by default — no scheduler when disabled; `local` demo job proves the mechanism offline. Durable path = Cloud Scheduler/Tasks → authenticated HTTP job endpoint per product ([`BACKGROUND_JOBS.md`](../integrations/BACKGROUND_JOBS.md)); in-process `@Scheduled` is not durable on scale-to-zero Cloud Run |
 | Playwright browser E2E | ✅ | vs DEV backend |
 | Slack deploy alerts | ✅ optional | DEV + PROD notify jobs when `SLACK_WEBHOOK` is set |
@@ -32,7 +33,7 @@ Status legend: ✅ implemented · 🟡 partial (pattern doc only / pending live 
 | Integration | Status / blockers | Priority | Effort | Free at template scale? | Spring can do it? | Notes |
 |---|---|---|---|---|---|---|
 | Sign-up abuse gate (reCAPTCHA Enterprise / App Check enforcement / blocking functions) | 🟡 phased A→C→B — A: native App Check wired, console+smoke pending; **C: backend + web client implemented** (route + gate, default-off; native deliberately stays client-direct); B: evidence-triggered ([runbook](../integrations/SIGNUP_ABUSE_GATE.md)) | High | A: console-only · C: ✅ done · B: 2–3 days | 🟡 10k assessments/mo free but **org-wide, shared with App Check minting**; Essentials hard-stops with 429 | ✅ backend done (`RecaptchaAssessorPort` + `RestClient` adapter) | Blocking functions cannot receive a reCAPTCHA token (no client channel; `recaptchaScore` is SMS-only) — C is Spring-mediated sign-up; native stays on A (no assessment SDK) |
-| Analytics + feature flags — **PostHog chosen** (Firebase Remote Config = documented flags-only fallback) | ❌ vendor decided, not implemented | Medium | ~1 day | ✅ 1M events + 1M flag requests/mo free, hard stop at limit | 🟡 `RestClient` adapter like Resend | One tool covers analytics + flags + the AI kill-switch (decision in §5) |
+| Analytics + feature flags — **PostHog chosen** (Firebase Remote Config = documented flags-only fallback) | ✅ implemented, opt-in (2026-09-04; runbook [`POSTHOG.md`](../integrations/POSTHOG.md)) | Medium | ~1 day | ✅ 1M events + 1M flag requests/mo free, hard stop at limit | ✅ `RestClient` adapter like Resend | One tool covers analytics + flags + the AI kill-switch (decision in §5); deploy-workflow activation steps documented, not wired |
 | Firebase Hosting web + security headers | ⛔ blocked on deployment | Medium | ~half day | ✅ free tier (10 GB) | ❌ CDN layer, not Spring | Expo web delivery + CORS/headers |
 | GCS file storage (signed-URL uploads) | 🟡 `ObjectStoragePort` pattern doc only, no code | Medium | 1–2 days | ✅ GCS free tier (5 GB) | ✅ `spring-cloud-gcp-storage` | Extension by design ([`STORAGE_EXTENSION.md`](../starter-backend/docs/STORAGE_EXTENSION.md)) |
 | Social login (Google/Apple) | ❌ Email/Password only today | Low (Apple → Medium if Google is added) | ~1 day | ✅ Firebase providers are free | 🟡 mostly client + console; backend unchanged (claims ride the token) | Sign in with Apple is **mandatory on iOS** if any other social login exists |
@@ -109,7 +110,7 @@ the architecture.
 1. **Firebase App Check** — ✅ done (security; backend JWT/JWKS + web provider, PROD-on)
 2. **Sentry** — ✅ done (observability; backend 5xx handler capture + mobile native, opt-in, web at v1)
 3. **Background jobs** — ✅ done (mechanism opt-in; Cloud Scheduler/Tasks activation = per app)
-4. **Analytics + feature flags** (~1 day) — PostHog (decided, §5): backend `FeatureFlagPort` + AI kill-switch, mobile `AnalyticsPort` + base events
+4. **Analytics + feature flags** — ✅ done (PostHog, §5): backend `FeatureFlagPort` + AI kill-switch, mobile `AnalyticsPort` + base events; runbook [`POSTHOG.md`](../integrations/POSTHOG.md)
 5. Everything else when a product fork needs it (extension rule)
 
 ## 7. Delivery tail (not integrations, but blocks v1)
