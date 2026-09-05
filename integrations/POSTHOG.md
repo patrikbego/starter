@@ -27,7 +27,7 @@ One **PostHog project per product app**; mobile and backend share it with differ
 
 ```text
 starter-mobile  ──events (capture, public project key)──────────▶ PostHog <app> project
-starter-backend ──definitions poll (secure API key, Secret Manager)──▶ same project
+starter-backend ──definitions poll (secret API key, Secret Manager)──▶ same project
      └─ FeatureFlagPort ◀── in-JVM evaluation of simple boolean flags
 ```
 
