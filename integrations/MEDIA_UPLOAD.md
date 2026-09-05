@@ -1,11 +1,15 @@
 # MEDIA_UPLOAD.md — Media Upload Extension (GCS storage + validation + variants + vision AI)
 
-**Status: implemented, opt-in (backend; spec contract v1).** Design doc:
+**Status: implemented, enabled by default (backend; spec contract v1).** Media
+follows the AI posture: the template ships it on, and a deployment opts out
+with `MEDIA_ENABLED=false` (routes then answer `503 MEDIA_DISABLED`). Storage
+is provisioned by Terraform (`{project-id}-media` bucket + runtime-SA IAM) and
+wired through the `MEDIA_STORAGE_BUCKET_<ENV>` repo variable. Design doc:
 `starter-backend/docs/MEDIA_UPLOAD_EXTENSION.md`; local mocks + cloud adapters
 (in-memory storage/metadata, GCS, Firestore, OpenRouter), full test coverage
 (unit + enabled/disabled integration + OpenAPI contract). This runbook is the
-activation guide: enable the extension, provision GCS, run the local proof, and
-verify the API flow. It mirrors `PUSH.md` / `STRIPE.md` in shape.
+activation guide: provision GCS, run the local proof, and verify the API flow.
+It mirrors `PUSH.md` / `STRIPE.md` in shape.
 
 ```text
 client ──POST /api/v1/media──▶ Cloud Run (validate + variants) ──▶ GCS bucket
@@ -27,9 +31,10 @@ client ──POST /api/v1/media──▶ Cloud Run (validate + variants) ──�
 - **Completion is delivered over the existing push channel, not WebSocket.**
   If push is disabled, the metadata endpoint is the fallback (analysis status is
   always there).
-- **The durable analysis drain is Cloud Scheduler/Tasks → the authenticated job
-  endpoint.** In-process `@Scheduled` exists only under `local`. Same posture as
-  [`BACKGROUND_JOBS.md`](./BACKGROUND_JOBS.md).
+- **The cloud analysis drain requires a Firebase `MEDIA_WORKER` identity.**
+  Direct Cloud Scheduler/Tasks OIDC authentication is unsupported; a product
+  must supply a worker that obtains Firebase ID tokens. In-process `@Scheduled`
+  exists only under `local`.
 
 ## Prerequisites
 
@@ -62,13 +67,21 @@ client ──POST /api/v1/media──▶ Cloud Run (validate + variants) ──�
    **Fail-closed:** `MEDIA_ENABLED=true` without a bucket, or
    `MEDIA_ANALYSIS_ENABLED=true` without a key, fails startup — there is no
    half-configured run.
-3. **Background drain (cloud, durable)** — Cloud Scheduler (cron, e.g.
-   `*/5 * * * *`) or Cloud Tasks → `POST /api/v1/media/jobs/analyze`,
-   authenticated via Cloud Scheduler OIDC / the runtime service account.
-   **Caveat:** the route currently accepts any Firebase bearer (no job
-   token/owner scoping) and drains all owners' pending rows — a jobs-only
-   credential is recommended hardening before production (see the
-   `MEDIA_UPLOAD_EXTENSION.md` Surface section in the backend repo).
+3. **Background drain (cloud)** — provision a dedicated Firebase worker UID
+   in the intended DEV or PROD project. From a trusted Admin environment,
+   read its existing custom claims, preserve unrelated claims, and assign
+   `role: MEDIA_WORKER` using `FirebaseAuth.setCustomUserClaims(uid, claims)`.
+   Review an existing conflicting `role` before replacing it; never grant this
+   role to an ordinary app user. The setter replaces the complete claim map;
+   see [Firebase's provisioning guidance](https://firebase.google.com/docs/auth/admin/custom-claims).
+   There is no bundled provisioning script or cloud worker runner.
+
+   The worker must exchange an Admin-created custom token for a fresh Firebase
+   ID token and use that ID token as the bearer for
+   `POST /api/v1/media/jobs/analyze` (batch limit 1–100). Custom tokens and
+   Scheduler/Tasks Google OIDC tokens are not accepted as API bearers.
+   With media and analysis enabled, verify the worker gets `200` and an
+   ordinary user gets `403`. The local scheduler needs no HTTP credential.
 4. **Verify locally** — `local` profile needs no network or credentials
    (in-memory storage + deterministic vision fake + mock push):
 

@@ -43,6 +43,7 @@ For strict “build once, promote” semantics, store images in a shared Artifac
 | `AI_MAX_INPUT_CHARS` | `4000` | Environment — input cap before provider call |
 | `AI_MAX_REQUESTS_PER_USER` | `120` | Environment — per-user quota window limit |
 | `AI_RATE_LIMIT_WINDOW` | `1h` | Environment — quota window (`Duration` syntax) |
+| `PORT` | `8080` | Cloud Run env only (web-server port; Spring binds `server.port`) |
 
 AI guardrails fail startup when missing in `dev`/`prod` (same fail-closed rule as
 the other required variables). Quota exhaustion returns `429` with a
@@ -135,15 +136,16 @@ Mobile: `EXPO_PUBLIC_POSTHOG_ENABLED`, `EXPO_PUBLIC_POSTHOG_API_KEY`, `EXPO_PUBL
 
 | Variable | Default | Notes |
 |---|---|---|
-| `MEDIA_ENABLED` | `false` | Routes answer `503 MEDIA_DISABLED` when off |
+| `MEDIA_ENABLED` | `true` | On by default (AI posture); `false` gates every route behind `503 MEDIA_DISABLED`. Cloud deploys without `MEDIA_STORAGE_BUCKET` fail fast in the deploy script |
+| `MEDIA_STORAGE_BUCKET` | `gs://{project-id}-media` (Terraform) | **Required when enabled**; local profile uses an in-memory mock bucket |
 | `MEDIA_UPLOAD_MODE` | `proxy` | `proxy` (implemented) \| `signed` (config-validated only) |
 | `MEDIA_MAX_FILE_SIZE` | `5MB` | `413 MEDIA_TOO_LARGE` |
-| `MEDIA_STORAGE_BUCKET` | — | **Required when enabled** |
 | `MEDIA_VARIANTS_ENABLED` / `MEDIA_VARIANT_FORMAT` | `true` / `webp` | Re-encoding on upload |
 | `MEDIA_DOWNLOAD_URL_TTL` | `15m` | Signed-URL lifetime |
 | `MEDIA_MAX_UPLOADS_PER_USER` / `MEDIA_RATE_LIMIT_WINDOW` | `120` / `1h` | Per-user upload quota |
-| `MEDIA_ANALYSIS_ENABLED` | `false` | Bytes leave the server only when enabled + key set |
-| `MEDIA_ANALYSIS_MODEL` / `BASE_URL` / `TIMEOUT` / `MAX_ATTEMPTS` / `STUCK_AFTER` / `POLL_INTERVAL` | `qwen/qwen3.7-flash`, `https://openrouter.ai/api/v1`, `30s`, `4`, `5m`, `PT30S` | Vision analysis reuses `OPENROUTER_API_KEY` |
+| `MAX_FILE_SIZE` / `MAX_REQUEST_SIZE` | `5MB` / `6MB` | Servlet multipart caps — `413 MEDIA_TOO_LARGE` regardless of `MEDIA_*` values |
+| `MEDIA_ANALYSIS_ENABLED` | `false` | Opt-in vision AI; bytes leave the server only when enabled + key set |
+| `MEDIA_ANALYSIS_MODEL` / `BASE_URL` / `TIMEOUT` / `MAX_ATTEMPTS` / `STUCK_AFTER` / `POLL_INTERVAL` | `qwen/qwen3.7-flash`, `https://openrouter.ai/api/v1`, `30s`, `4`, `5m`, `PT30S` | Vision analysis reuses `OPENROUTER_API_KEY` (Secret Manager `openrouter-api-key`) |
 
 #### Search (Typesense — **planned, not implemented**) — `integrations/SEARCH.md`
 
