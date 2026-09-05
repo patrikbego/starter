@@ -18,8 +18,9 @@ client ──POST /api/v1/media──▶ Cloud Run (validate + variants) ──�
   validation and variant re-encoding force the API to see bytes at least once,
   so `starter.media.upload-mode=proxy` is default. Downloads are `302` to
   short-TTL signed GCS URLs — the API never proxies read bytes in cloud
-  profiles. `upload-mode=signed` (client PUTs straight to GCS, then confirms)
-  stays available for large files that need no server-side processing.
+  profiles. `upload-mode=signed` is config-validated but **not wired in v1**
+  (the storage port issues no signed-PUT URLs and there is no confirm route);
+  it is the future path for large files that need no server-side processing.
 - **Analysis is off by default.** `starter.media.analysis.enabled=false`: no
   bytes leave the server unless you enable it with a key. Only the re-encoded
   `web` variant is ever sent to the provider, never the original.
@@ -71,7 +72,7 @@ client ──POST /api/v1/media──▶ Cloud Run (validate + variants) ──�
    (in-memory storage + deterministic vision fake + mock push):
 
    ```bash
-   MEDIA_ENABLED=true ./mvnw spring-boot:run
+   SPRING_PROFILES_ACTIVE=local MEDIA_ENABLED=true ./mvnw spring-boot:run
    # register/login, then:
    curl -s -X POST http://localhost:8080/api/v1/media \
      -H "Authorization: Bearer $TOKEN" -F 'file=@photo.png'   # expect 201 + variants + analysis
