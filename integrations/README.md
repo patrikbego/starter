@@ -6,6 +6,10 @@ buildout history), and the backend/mobile repositories own the implementation do
 
 > Status and priorities for every integration (done, missing, cost, Spring coverage) live in
 > [`docs/integrations-plan.md`](../docs/integrations-plan.md).
+>
+> Need the *exact console URLs and identifiers* for the template's own DEV instance (Firebase
+> project, Cloud Run URL, PostHog project, Mailtrap inbox, …)? See
+> [`LINKS.md](./LINKS.md).
 
 ## Product-facing integrations (runtime)
 
@@ -13,8 +17,8 @@ buildout history), and the backend/mobile repositories own the implementation do
 |---|---|---|---|
 | Firebase Authentication | ✅ implemented | [FIREBASE_AUTH.md](./FIREBASE_AUTH.md) | [starter-backend/docs/AUTHENTICATION.md](../starter-backend/docs/AUTHENTICATION.md) |
 | Social login (Google/Apple) | ✅ web implemented (2026-09-05); native pending | [SOCIAL_LOGIN.md](./SOCIAL_LOGIN.md) | — |
-| Firebase App Check | ✅ implemented (web), 🟡 native stubbed | [APP_CHECK.md](./APP_CHECK.md) | [starter-backend/docs/SECURITY.md](../starter-backend/docs/SECURITY.md) |
-| Sign-up abuse gate | 🟡 plan + runbook ready, phased A→C→B (no code yet) | [SIGNUP_ABUSE_GATE.md](./SIGNUP_ABUSE_GATE.md) | (Phase C backend work not started) |
+| Firebase App Check | ✅ implemented (web); native wired in code — activation per app | [APP_CHECK.md](./APP_CHECK.md) | [starter-backend/docs/SECURITY.md](../starter-backend/docs/SECURITY.md) |
+| Sign-up abuse gate | 🟡 A + C implemented in code (App Check + reCAPTCHA Enterprise gate, both default-off); console + per-app activation pending | [SIGNUP_ABUSE_GATE.md](./SIGNUP_ABUSE_GATE.md) | [starter-backend/docs/SECURITY.md](../starter-backend/docs/SECURITY.md) |
 | AI chat via OpenRouter | ✅ implemented | [OPENROUTER_AI.md](./OPENROUTER_AI.md) | [starter-backend/docs/AI_INTEGRATION.md](../starter-backend/docs/AI_INTEGRATION.md) |
 | Firestore (database) | ✅ implemented | (provisioned by Terraform — no separate runbook) | [starter-backend/docs/DATABASE.md](../starter-backend/docs/DATABASE.md) |
 | Stripe billing | ✅ implemented, opt-in | [STRIPE.md](./STRIPE.md) | [starter-backend/docs/BILLING_EXTENSION.md](../starter-backend/docs/BILLING_EXTENSION.md) |
@@ -24,9 +28,12 @@ buildout history), and the backend/mobile repositories own the implementation do
 | PostHog analytics + feature flags | ✅ implemented, opt-in (backend local evaluation + AI kill-switch; mobile analytics, web included) | [POSTHOG.md](./POSTHOG.md) | [starter-backend/docs/FEATURE_FLAGS.md](../starter-backend/docs/FEATURE_FLAGS.md) · mobile `src/telemetry/posthog.ts` |
 | GCS file storage (signed-URL uploads) | 🟡 pattern doc only | (see implementation doc) | [starter-backend/docs/STORAGE_EXTENSION.md](../starter-backend/docs/STORAGE_EXTENSION.md) |
 | Media upload (GCS + validation + variants + vision AI) | 🟢 implemented, opt-in (backend; local mocks + cloud adapters) | [MEDIA_UPLOAD.md](./MEDIA_UPLOAD.md) | [starter-backend/docs/MEDIA_UPLOAD_EXTENSION.md](../starter-backend/docs/MEDIA_UPLOAD_EXTENSION.md) |
-| Playwright browser E2E vs DEV backend | ✅ P0–P4 implemented | [BROWSER_E2E.md](./BROWSER_E2E.md) | — |
+| Playwright browser E2E vs DEV backend | ✅ P0–P6 implemented | [BROWSER_E2E.md](./BROWSER_E2E.md) | — |
 | Firebase Hosting (permanent web URL) | ✅ implemented (DEV) | [FIREBASE_HOSTING.md](./FIREBASE_HOSTING.md) | — |
 | Mailtrap email sandbox (auth-email capture for E2E) | ✅ code + runbook ready, relay + API token active on DEV; **spec is manual-run only, excluded from the PR gate** (quota-sensitive) | [MAILTRAP.md](./MAILTRAP.md) | — |
+| Search (Typesense; Algolia = swap) | 🟡 pattern doc + runbook, vendor decided; **not implemented** | [SEARCH.md](./SEARCH.md) | [starter-backend/docs/SEARCH_EXTENSION_NOT_IMPLEMENTED.md](../starter-backend/docs/SEARCH_EXTENSION_NOT_IMPLEMENTED.md) |
+| Deep links (custom scheme ✅ shipped; universal links = runbook) | 🟡 scheme works; https half per-product domain | [DEEP_LINKS.md](./DEEP_LINKS.md) | — |
+| LLM observability (Langfuse) | 🟡 Spring AI ships OTel tracing by default; Langfuse = OTLP config, not wired | [LANGUFUSE.md](./LANGUFUSE.md) | [starter-backend/docs/AI_INTEGRATION.md](../starter-backend/docs/AI_INTEGRATION.md) |
 
 ## Operational integrations
 

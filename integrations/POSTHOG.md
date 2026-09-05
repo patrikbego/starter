@@ -19,11 +19,14 @@ One **PostHog project per product app**; mobile and backend share it with differ
   `starter-mobile/.env` (`EXPO_PUBLIC_POSTHOG_ENABLED=true`, project key, US host).
 - Backend: keys stored in gitignored `starter-backend/.env` for the `dev-local` smoke
   (`FLAGS_ENABLED=true`, project secret API key with `feature_flag:read`, project key, US
-  host) — endpoint verified live: `HTTP 200`, flag `ai-chat-enabled` active at 100%.
+  host) — endpoint verified live against the **dev-local PostHog project**: `HTTP 200`, flag
+  `ai-chat-enabled` active at 100%.
   Cloud wiring (Secret Manager + deploy-workflow steps) **landed 2026-09-05** (§2); the
   per-project cloud activation run itself is still pending.
-- Pending: create flag `ai-chat-enabled` (boolean, 100%) in the PostHog UI; DEV kill-switch
-  drill (§4).
+- Done in the template's own PostHog project: flag `ai-chat-enabled` (boolean, 100%) created
+  and the DEV kill-switch drill executed 2026-09-04 (§4 — the off/on transition ran against a
+  local mock PostHog because the flag key is read-only by design). Per-product cloud activation
+  (Secret Manager + wiring in a new product's deploy workflows) remains the per-app step.
 
 ```text
 starter-mobile  ──events (capture, public project key)──────────▶ PostHog <app> project
@@ -93,7 +96,8 @@ starter-backend ──definitions poll (secret API key, Secret Manager)──▶
 | Default config keys | `src/main/resources/application.yml` → `starter.flags.*` block | `starter.sentry.*`, `starter.email.*` |
 | Tests | `PostHogFlagAdapterTest`, `FeatureFlagsConfigTest`, `AiRequestGuardTest` | `ResendEmailAdapterTest` pattern |
 
-Config keys (all `starter.flags.*`, env-tunable):
+Config keys (all `starter.flags.*`, env-tunable; the env-name table also lives in
+[`docs/ENVIRONMENT_MATRIX.md`](../docs/ENVIRONMENT_MATRIX.md) §PostHog):
 
 ```yaml
 starter:

@@ -70,10 +70,7 @@ The backend already uses Maven; run the `sonar` goal on top of the normal build:
 
 (`sonar.projectName` is optional — it defaults to `sonar.projectKey`.)
 
-**Coverage note:** as written, this reports **0% coverage** unless JaCoCo configures the build. The
-starter backend does not bundle the `jacoco-maven-plugin` yet, and SonarQube's default report path
-(`target/site/jacoco/jacoco.xml`) reads nothing without it. To get real coverage: add the
-`jacoco-maven-plugin` prepare-agent + report executions, then run `verify sonar:sonar`.
+**Coverage note:** the starter backend bundles the `jacoco-maven-plugin` (0.8.13, `prepare-agent` + `report` in `starter-backend/pom.xml`) and reports real coverage from `./mvnw verify` (JaCoCo writes `target/site/jacoco/jacoco.xml`, which SonarQube reads at `target/site/jacoco/jacoco.xml`). Run `./mvnw verify sonar:sonar` to push coverage.
 
 ### Mobile (TypeScript / Expo)
 

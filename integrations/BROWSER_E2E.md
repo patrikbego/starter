@@ -1,6 +1,6 @@
 # Browser E2E Integration Plan — Mobile app × DEV backend
 
-**Status: P0–P4 implemented 2026-08-23.** Playwright suite green locally and in CI
+**Status: P0–P6 implemented (2026-08-23; P5/P6 added 08-24/08-29).** Playwright suite green locally and in CI
 (`web-e2e` PR gate 2m42s + `web-e2e-ai` dispatch job, both success); AI spec dispatch-only.
 Work top-to-bottom; decisions below are resolved.
 Companion to [`STEP5_FIRST_PUSH_CHECKLIST.md`](../guides/STEP5_FIRST_PUSH_CHECKLIST.md) (§5 CI path is
@@ -29,7 +29,7 @@ with Jest unit tests now, Maestro-on-Android later if wanted.
 |---|---|
 | App uses Firebase **JS SDK**, which runs natively in browsers | `firebase@^12.7.0` in `package.json` |
 | The auth adapter **already branches for web** (browser persistence) | `src/adapters/FirebaseAuthAdapter.ts:25` (`Platform.OS === 'web'` → plain `getAuth`) |
-| DEV backend CORS **already allows** the origin we need | `deploy-dev.yml:161` — `STARTER_CORS_ALLOWED_ORIGINS=http://localhost:8081,…` |
+| DEV backend CORS **already allows** the origin we need | `deploy-dev.yml` — the DEV deploy step's `STARTER_CORS_ALLOWED_ORIGINS=http://localhost:8081,…` env block |
 | Routes exist for the full flow | `app/(auth)/login.tsx`, `app/(tabs)/index.tsx`, `app/(tabs)/chat.tsx` |
 
 → **Zero backend changes required** as long as the exported site is served on `http://localhost:8081`.
@@ -188,7 +188,7 @@ Playwright specs don't count against the coverage gate.
 | A dependency breaks web export despite the adapter being web-ready | P0 spike gates everything; if blocked, fall back to Maestro-on-Android as the first tier instead |
 | Flaky UI tests erode trust | retry 1×, traces on failure, keep specs to flow-level assertions (no pixel/snapshot brittleness) |
 | OpenRouter spend creep | AI spec dispatch-only, one message per run |
-| Port drift breaks CORS silently | pin 8081 in config + comment linking `deploy-dev.yml:161`; if the origin ever changes, update BOTH sides |
+| Port drift breaks CORS silently | pin 8081 in config + comment linking the `STARTER_CORS_ALLOWED_ORIGINS` env in `deploy-dev.yml`; if the origin ever changes, update BOTH sides |
 | Per-run registrations accumulate in DEV Firebase Auth | harmless at template scale; prune manually, or add teardown delete via Admin SDK later |
 | Sign-up left as default entry point could let CI runs fail on `email-already-in-use` if run-id collisions were ever introduced | run-id includes timestamp + run number; see Decision 3 |
 

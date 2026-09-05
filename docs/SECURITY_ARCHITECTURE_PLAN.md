@@ -61,10 +61,10 @@ Decisions that shape everything else:
 | # | Now item | Status |
 |---|---|---|
 | 1 | Firestore deny-all rules + IAM | ✅ rules file, `firebase.json` wiring, deploy script added; IAM already least-privilege. Deploying rules = Phase 5/6 |
-| 2 | App Check (client + backend verify) | ✅ done (web) / 🟡 native wired in code (opt-in, pending console registration + EAS live smoke) — backend verifies RS256 JWT/JWKS manually (the Java Admin SDK has no AppCheck API, so no SDK bump unlocks it); requires a valid token on `/api/v1/ai/chat` when enabled (default off, PROD-on); web provider shipped; native = `@react-native-firebase/app-check` behind the same toggle |
+| 2 | App Check (client + backend verify) | ✅ done (web) / 🟡 native wired in code (opt-in, pending console registration + EAS live smoke) — backend verifies RS256 JWT/JWKS manually (the Java Admin SDK has no AppCheck API, so no SDK bump unlocks it); requires a valid token on `/api/v1/ai/chat` when enabled (default off, per-env `APP_CHECK_ENABLED_*` repo-var gate); web provider shipped; native = `@react-native-firebase/app-check` behind the same toggle |
 | 3 | Cloud Run cost containment | ✅ `min=0` / `concurrency` encoded in deploy workflows; `max-instances` = attack budget. Live application = Phase 5/6 |
 | 4 | AI cost controls | ✅ kill-switch `AI_ENABLED` added; quota/caps/timeout already baseline. Budgets-as-code added to `infra/` + `COST_CONTROLS.md` runbook; live apply/wiring = Phase 5/6 |
-| 5 | Firebase Hosting web + CORS/headers | ⛔ blocked on Phase 5/6 (deployment) |
+| 5 | Firebase Hosting web + CORS/headers | ✅ DEV implemented (Expo web export deployed `https://starter-demo-dev.web.app` with security headers in `firebase.json`; CORS origin in DEV backend). PROD site pending Phase 5 |
 | 6 | Sign-up abuse gate | 🟡 phased A→C→B ([runbook](../integrations/SIGNUP_ABUSE_GATE.md)) — A: native App Check wired, console+smoke pending; C: **done** (backend route + gate default-off; web client adoption; native stays client-direct); B needs Cloud Functions (Phase 5/6) |
 | 7 | Observability & errors | ✅ baseline; added `starter.ai.rejected/reason=disabled` metric |
 | 8 | Secrets/CI + supply chain | ✅ baseline (WIF, Dependabot, Trivy gate); image-scanning budget decision still open |
@@ -81,8 +81,8 @@ Decisions that shape everything else:
   SDK has no `AppCheck.verifyToken` (verified in `firebase-admin:9.10.0`), the backend verifies
   the RS256 token manually against the project's public keys (Nimbus JWT/JWKS). Web provider
   shipped; native is wired in code (`@react-native-firebase/app-check` behind the opt-in toggle)
-  pending console registration + EAS live smoke. Enforcement off by default, PROD-on after a
-  live smoke.
+  pending console registration + EAS live smoke. Enforcement off by default, per-env
+  `APP_CHECK_ENABLED_*` repo-var gate (PROD-on after a live smoke).
 - **Firebase Hosting** web app + CORS origin + security headers on the served app.
   Web app and CORS origin: **implemented** ([FIREBASE_HOSTING.md](../integrations/FIREBASE_HOSTING.md)).
   Security headers: **implemented 2026-09-05** in `starter-mobile/firebase.json` `headers`

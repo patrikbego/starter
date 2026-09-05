@@ -153,7 +153,7 @@ See the backend and mobile CI/CD documents for executable workflow requirements.
 - Microservices or Kubernetes
 - A generic workflow engine
 - Multi-tenant organizations or admin portals
-- File storage, OCR, subscriptions, vector search, or RAG
+- Product-grade file storage, subscriptions, search, or RAG (opt-in extensions exist — see `integrations/MEDIA_UPLOAD.md`, `STRIPE.md`, `SEARCH.md`; they are not starter core)
 - Offline-first synchronization
 - Provider-specific AI features in domain code
 - Automatic propagation of starter changes into created product repositories

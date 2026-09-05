@@ -34,9 +34,10 @@ For strict “build once, promote” semantics, store images in a shared Artifac
 |---|---|---|
 | `SPRING_PROFILES_ACTIVE` | `dev` or `prod` | Cloud Run environment |
 | `GCP_PROJECT_ID` | `{app}-dev` | Cloud Run environment |
-| `{APP}_CORS_ALLOWED_ORIGINS` | `https://admin.example.com` | Cloud Run environment |
+| `STARTER_CORS_ALLOWED_ORIGINS` | `https://admin.example.com,https://app.example.com` | Cloud Run environment — comma-separated allow-list |
 | `OPENAI_API_KEY` | secret value | Secret Manager |
-| `AI_MODEL` | provider model identifier | Environment/managed config |
+| `AI_CHAT_MODEL` | `deepseek/deepseek-v4-flash-0731` | Environment — provider model identifier (default in `application.yml`) |
+| `AI_ENABLED` | `true` | Cloud Run environment — fail-closed kill-switch for the AI money path |
 | `ACTUATOR_PASSWORD` | secret value | Secret Manager, only if Basic-auth actuator is retained |
 | `AI_REQUEST_TIMEOUT` | `30s` | Environment — provider call bound |
 | `AI_MAX_INPUT_CHARS` | `4000` | Environment — input cap before provider call |
@@ -48,20 +49,107 @@ the other required variables). Quota exhaustion returns `429` with a
 `Retry-After` header. The per-instance nature of the default quota store and
 other limitations are tracked in `./REVIEW_FINDINGS.md` (caveat C1).
 
-Recommended operational variables:
+#### Recommended operational variables
 
 | Variable | Purpose |
 |---|---|
-| `AI_RATE_LIMIT_WINDOW` | Length of the per-user quota window (now required in cloud profiles) |
-| `LOG_FORMAT` | Human local logs versus structured cloud logs |
+| `AI_BASE_URL` | Provider base URL (default `https://openrouter.ai/api/v1` in `application.yml`) |
+| `AI_TEMPERATURE` | Provider sampling temperature (default `0.7` in `application.yml`) |
 
-Optional App Check extension (off by default; see `integrations/APP_CHECK.md`):
+### Extension variables (opt-in, off by default)
+
+Every extension defaults to disabled; enabling without its required values fails startup
+(fail-closed). Names/defaults are defined once in
+`starter-backend/src/main/resources/application.yml`. **This table is the single source for
+extension env var names — runbooks and extension design docs link here; they do not restate it.**
+
+#### Billing (Stripe) — `integrations/STRIPE.md`
+
+| Variable | Default | Notes |
+|---|---|---|
+| `BILLING_ENABLED` | `false` | Kill-switch; routes answer `503 BILLING_DISABLED` when off |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_ID` | — | Secret Manager |
+| `BILLING_SUCCESS_URL` / `BILLING_CANCEL_URL` / `BILLING_PORTAL_RETURN_URL` | `http://localhost:8081/billing/...` | Hosted Checkout/portal return URLs |
+
+#### Email (Resend) — `integrations/RESEND.md`
+
+| Variable | Default | Notes |
+|---|---|---|
+| `EMAIL_ENABLED` | `false` | Kill-switch (no API routes) |
+| `RESEND_API_KEY` | — | Secret Manager |
+| `EMAIL_FROM` | — | Verified sender |
+| `RESEND_BASE_URL` | `https://api.resend.com` | |
+
+#### Push — `integrations/PUSH.md`
+
+| Variable | Default | Notes |
+|---|---|---|
+| `PUSH_ENABLED` | `false` | Routes answer `503 PUSH_DISABLED` when off |
+| `EXPO_ACCESS_TOKEN` | — | Optional (higher rate limits) |
+| `EXPO_PUSH_BASE_URL` | `https://exp.host` | |
+
+#### App Check — `integrations/APP_CHECK.md`
 
 | Variable | Source | Notes |
 |---|---|---|
-| `APP_CHECK_ENABLED_DEV` / `APP_CHECK_ENABLED_PROD` | GitHub repo variables | Set `true` to turn enforcement on for that environment |
-| `APP_CHECK_PROJECT_NUMBER_DEV` / `APP_CHECK_PROJECT_NUMBER_PROD` | GitHub repo variables | The Firebase project number (token `aud`); not a secret |
+| `APP_CHECK_ENABLED_DEV` / `APP_CHECK_ENABLED_PROD` | GitHub repo variables | Set `true` to turn enforcement on for that environment (workflows bind runtime `APP_CHECK_ENABLED`) |
+| `APP_CHECK_PROJECT_NUMBER_DEV` / `APP_CHECK_PROJECT_NUMBER_PROD` | GitHub repo variables | The Firebase project number (token `aud`); not a secret (workflows bind runtime `APP_CHECK_PROJECT_NUMBER`) |
 | `APP_CHECK_JWKS_URI` | Environment | Optional override; defaults to the Firebase App Check JWKS |
+
+#### Server-mediated sign-up (reCAPTCHA Enterprise) — `integrations/SIGNUP_ABUSE_GATE.md`
+
+| Variable | Default | Notes |
+|---|---|---|
+| `RECAPTCHA_ENABLED` | `false` | Kill-switch; off by default |
+| `RECAPTCHA_PROJECT_ID` / `RECAPTCHA_SITE_KEY` / `RECAPTCHA_API_KEY` | — | `API_KEY` = Secret Manager |
+| `RECAPTCHA_EXPECTED_ACTION` / `RECAPTCHA_MIN_SCORE` | `sign-up` / `0.5` | |
+| `RECAPTCHA_BASE_URL` | `https://recaptchaenterprise.googleapis.com` | |
+
+#### Sentry — `integrations/SENTRY.md`
+
+| Variable | Default | Notes |
+|---|---|---|
+| `SENTRY_ENABLED` | `false` | Kill-switch; requires `SENTRY_DSN` when enabled |
+| `SENTRY_DSN` | — | Secret Manager |
+
+#### PostHog (analytics + feature flags) — `integrations/POSTHOG.md`
+
+| Variable | Default | Notes |
+|---|---|---|
+| `FLAGS_ENABLED` | `false` | Backend flag evaluation (kill-switch) |
+| `POSTHOG_API_KEY` | — | Project **secret** key, `feature_flag:read` — Secret Manager |
+| `POSTHOG_PROJECT_API_KEY` | — | Public `phc_...` |
+| `POSTHOG_HOST` | `https://eu.i.posthog.com` | |
+| `FLAGS_POLL_INTERVAL` / `FLAGS_TIMEOUT` | `30s` / `3s` | |
+
+Mobile: `EXPO_PUBLIC_POSTHOG_ENABLED`, `EXPO_PUBLIC_POSTHOG_API_KEY`, `EXPO_PUBLIC_POSTHOG_HOST`.
+
+#### Background jobs — `integrations/BACKGROUND_JOBS.md`
+
+| Variable | Default | Notes |
+|---|---|---|
+| `JOBS_ENABLED` | `false` | No scheduler when off |
+| `JOBS_DEMO_INTERVAL` | `PT1M` | `local` demo cadence |
+
+#### Media upload — `integrations/MEDIA_UPLOAD.md`
+
+| Variable | Default | Notes |
+|---|---|---|
+| `MEDIA_ENABLED` | `false` | Routes answer `503 MEDIA_DISABLED` when off |
+| `MEDIA_UPLOAD_MODE` | `proxy` | `proxy` (implemented) \| `signed` (config-validated only) |
+| `MEDIA_MAX_FILE_SIZE` | `5MB` | `413 MEDIA_TOO_LARGE` |
+| `MEDIA_STORAGE_BUCKET` | — | **Required when enabled** |
+| `MEDIA_VARIANTS_ENABLED` / `MEDIA_VARIANT_FORMAT` | `true` / `webp` | Re-encoding on upload |
+| `MEDIA_DOWNLOAD_URL_TTL` | `15m` | Signed-URL lifetime |
+| `MEDIA_MAX_UPLOADS_PER_USER` / `MEDIA_RATE_LIMIT_WINDOW` | `120` / `1h` | Per-user upload quota |
+| `MEDIA_ANALYSIS_ENABLED` | `false` | Bytes leave the server only when enabled + key set |
+| `MEDIA_ANALYSIS_MODEL` / `BASE_URL` / `TIMEOUT` / `MAX_ATTEMPTS` / `STUCK_AFTER` / `POLL_INTERVAL` | `qwen/qwen3.7-flash`, `https://openrouter.ai/api/v1`, `30s`, `4`, `5m`, `PT30S` | Vision analysis reuses `OPENROUTER_API_KEY` |
+
+#### Search (Typesense — **planned, not implemented**) — `integrations/SEARCH.md`
+
+| Variable | Default | Notes |
+|---|---|---|
+| `SEARCH_ENABLED` / `SEARCH_PROVIDER` / `SEARCH_HOST` / `SEARCH_API_KEY` / `SEARCH_COLLECTION` / `SEARCH_TIMEOUT` | off; `typesense`; `documents`; `3s` | Pattern doc only — no code ships until a product needs it |
 
 ### `dev-local`
 
@@ -87,7 +175,7 @@ Use EAS environments so the same public variable names resolve to environment-sp
 | Variable | DEV preview | PROD store build |
 |---|---|---|
 | `APP_ENV` | `development` | `production` |
-| `EXPO_PUBLIC_API_BASE_URL` | DEV Cloud Run URL | PROD API URL |
+| `API_BASE_URL_DEV` / `API_BASE_URL_PROD` | DEV Cloud Run URL | PROD API URL (not `EXPO_PUBLIC_`-prefixed; consumed in `app.config.ts`) |
 | `EXPO_PUBLIC_FIREBASE_API_KEY` | DEV Firebase value | PROD Firebase value |
 | `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN` | DEV domain | PROD domain |
 | `EXPO_PUBLIC_FIREBASE_PROJECT_ID` | `{app}-dev` | `{app}-prod` |

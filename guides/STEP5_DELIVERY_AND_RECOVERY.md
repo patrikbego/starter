@@ -1,6 +1,6 @@
 # Step 5 — Delivery and Recovery (Phase 5 of the roadmap)
 
-Status of this guide: **draft, planning only.** The tasks below are the work to do; nothing here is implemented yet.
+Status of this guide: **workflow side implemented and verified** (gated DEV deploy, digest-only PROD promotion, smoke/alerts, release metadata, rollback runbooks). Live execution per app (pushed repos, GCP projects, EAS credentials) is the remaining external step. See the per-workstream status blocks below.
 
 Phase 5 goal (from [`docs/IMPLEMENTATION_ROADMAP.md`](../docs/IMPLEMENTATION_ROADMAP.md)):
 

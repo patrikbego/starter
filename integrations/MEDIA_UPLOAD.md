@@ -49,16 +49,14 @@ client ──POST /api/v1/media──▶ Cloud Run (validate + variants) ──�
 1. **GCS** — create the bucket, set IAM as above. Uniform bucket-level access,
    public access prevention enforced, no public URLs (signed URLs only).
    Local dev can use [fake-gcs-server](https://github.com/fsouza/fake-gcs-server).
-2. **Env** (service env vars, cloud profiles):
+2. **Env** (service env vars, cloud profiles) — the full `MEDIA_*` name/default table lives in
+   [`docs/ENVIRONMENT_MATRIX.md`](../docs/ENVIRONMENT_MATRIX.md) §Media upload; this runbook
+   deliberately does not restate it. Minimum activation:
 
    ```text
    MEDIA_ENABLED=true
    MEDIA_STORAGE_BUCKET=gs://{project-id}-media
-   MEDIA_MAX_FILE_SIZE=5MB
-   MEDIA_DOWNLOAD_URL_TTL=15m
-   MEDIA_ANALYSIS_ENABLED=false        # or true + key below
-   OPENROUTER_API_KEY=sk-or-v1-...     # Secret Manager, only if analysis enabled
-   MEDIA_ANALYSIS_MODEL=qwen/qwen3.7-flash
+   MEDIA_ANALYSIS_ENABLED=false            # or true + OPENROUTER_API_KEY (Secret Manager)
    ```
 
    **Fail-closed:** `MEDIA_ENABLED=true` without a bucket, or
@@ -66,8 +64,11 @@ client ──POST /api/v1/media──▶ Cloud Run (validate + variants) ──�
    half-configured run.
 3. **Background drain (cloud, durable)** — Cloud Scheduler (cron, e.g.
    `*/5 * * * *`) or Cloud Tasks → `POST /api/v1/media/jobs/analyze`,
-   authenticated via Cloud Scheduler OIDC / the runtime service account. The
-   extension answers only that authenticated caller; users never reach it.
+   authenticated via Cloud Scheduler OIDC / the runtime service account.
+   **Caveat:** the route currently accepts any Firebase bearer (no job
+   token/owner scoping) and drains all owners' pending rows — a jobs-only
+   credential is recommended hardening before production (see the
+   `MEDIA_UPLOAD_EXTENSION.md` Surface section in the backend repo).
 4. **Verify locally** — `local` profile needs no network or credentials
    (in-memory storage + deterministic vision fake + mock push):
 

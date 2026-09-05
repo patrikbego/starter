@@ -83,7 +83,7 @@ service account. All three values are GitHub repo secrets on the *backend* repo
 
 Firebase Auth sends the auth emails (verification, password reset). Product email the backend
 originates (welcome, notifications, receipts) is the separate Resend integration —
-[RESEND.md](./RESEND.md), designed but not yet implemented.
+[RESEND.md](./RESEND.md), implemented in the templates (2026-08-29), opt-in at runtime.
 
 ## Verify (per environment)
 

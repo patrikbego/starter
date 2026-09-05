@@ -26,10 +26,10 @@ Common subsets referenced below: **agility**, **dependability**, and **securabil
 | availability | Covered (foundation) | Cloud Run managed scaling and restarts; multi-region availability is not designed yet. |
 | compatibility | Covered | Versioned HTTP contract (v1) owned by the backend and pinned+validated by mobile CI; provider-neutral OpenAI-compatible AI port; pinned Expo/Spring versions. |
 | composability | Covered | Backend ports/adapters compose cleanly; mobile feature modules sit on a thin API client. |
-| confidentiality | Covered | No server secrets in the app; Secret Manager + Workload Identity; no tokens, prompts, or PII logged. |
+| confidentiality | Covered | No server secrets in the app; Secret Manager + Workload Identity; no tokens or prompts logged. One caveat: `UserService` still logs the user's email at account creation (REVIEW_FINDINGS P1#9 — personal data, prefer pseudonymous id). |
 | configurability | Covered | Environment-driven spring profiles; build-time-validated app config; fail-closed startup is the Phase 2 target. |
 | convenience | Covered | One-command quick starts, `.env.example`, wrapper scripts, guided run docs. |
-| correctness | Covered | 14 backend tests, TypeScript, and direct ESLint gated in CI; DTO validation annotations. |
+| correctness | Covered | 287 backend tests (incl. JWT/config/contract guards), strict TypeScript, and direct ESLint gated in CI; DTO validation annotations. |
 | credibility | Covered | Evidence-based `REVIEW_FINDINGS.md` (file/line references); every doc labels prototype vs. target v1. |
 | customizability | Covered | Rename/branding checklist and extension-point docs in `NEW_APP_WORKFLOW.md`. |
 | debuggability | Covered | Explicit `local` mock profile with DEBUG logging, correlation IDs, IDE/CLI run guides. |
@@ -37,7 +37,7 @@ Common subsets referenced below: **agility**, **dependability**, and **securabil
 | determinability | Covered | Deterministic local mocks behind an explicit `local` profile; in-memory persistence for tests. |
 | demonstrability | Covered | Run guides walk the full starter loop (login → `/me` → AI chat) end to end. |
 | dependability | Covered | Aggregated from subsets below: availability, fault-tolerance, reliability, recoverability, resilience. |
-| deployability | Covered (foundation) | Docker + Cloud Run + EAS Build; "build once, promote" digest promotion is roadmap Phase 5. |
+| deployability | Covered | Docker + Cloud Run + EAS Build; "build once, promote" digest promotion implemented (`deploy-dev.yml` gated, `promote-prod.yml` digest-only, verified 2026-08-29). |
 | discoverability | Covered | Contract v1 published at `openapi/openapi.yaml`, pinned into the mobile repo, and validated in both repos' CI. |
 | distributability | Covered | Stateless backend scales horizontally on Cloud Run; mobile is distributed via app stores. |
 | durability | Covered | Firestore (managed) for user data; retention/export/restore/deletion policies not yet defined. |
@@ -72,7 +72,7 @@ Common subsets referenced below: **agility**, **dependability**, and **securabil
 | precision | Covered | Integration tests assert exact HTTP status/body; explicit DTOs. |
 | predictability | Covered | No default profile; explicit profiles and deterministic mocks; `ConfigFailClosedTest` guards against reintroducing a default or permissive fallbacks. |
 | process capabilities | Covered | Merge-gated CI, DEV deploy, PROD approval input, release-record template. |
-| proactivity | Not yet | Alerting/SLOs and automated failure reporting are roadmap Phase 5. |
+| proactivity | Partially | Alerting and automated failure reporting shipped (`smoke-dev`/`smoke-prod` + Slack `notify` jobs); SLOs and alert review are roadmap Phase 5/6. |
 | producibility | Covered | Products are created from tagged releases by design; end-to-end proof is Phase 6. |
 | provability | Covered (tests) | Automated tests prove API contracts; formal verification is out of scope. |
 | recoverability | Covered (foundation) | Cloud Run revision rollback; formal backend/store rollback drills are Phase 6. |
@@ -91,14 +91,14 @@ Common subsets referenced below: **agility**, **dependability**, and **securabil
 | seamlessness | Covered | Automatic session refresh with one retry; sign-out clears cached data. |
 | self-sustainability | Not yet | Runtime relies on platform recycling (Cloud Run); custom self-healing/alerting not automated. |
 | serviceability (a.k.a. supportability) | Covered | Structured logs, health endpoints, rollback-by-revision, run guides per environment. |
-| securability | Covered | Confidentiality + integrity + safety rows; hardened identity (App Check) is a P2 consideration. |
+| securability | Covered | Confidentiality + integrity + safety rows; hardened identity (App Check) implemented opt-in (web live, native wired — activation per app). |
 | simplicity | Covered | Flat layering, no microservices/Kubernetes, explicit non-goals in the architecture overview. |
 | stability | Covered | Pinned versions and lockfiles; Spring Boot 4.1 / Spring AI 2.0 supported baseline (Phase 3) with Dependabot schedules ready. |
 | standards compliance | Covered | HTTP/JSON, JWTs, OpenAI-compatible surface, and a published OpenAPI 3 contract that CI keeps in sync with the implementation. |
 | survivability | Not yet | No multi-region/DR topology; disaster-recovery drills are Phase 6. |
 | sustainability | NA | Energy/organizational sustainability is outside the template contract. |
 | tailorability | Covered | Tailoring per product = customizability path (rename + env config in `NEW_APP_WORKFLOW.md`). |
-| testability | Covered | 40 backend unit/integration tests incl. Firestore emulator round trip, rate-limit/input/timeout behavior, and the OpenAPI contract guard; mobile `tsc`/ESLint gates. |
+| testability | Covered | 287 backend unit/integration tests incl. Firestore emulator round trip, rate-limit/input/timeout behavior, and the OpenAPI contract guard; mobile 201 Jest tests + `tsc`/ESLint gates. |
 | timeliness | Not yet | No latency or freshness SLOs/budgets; acceptable at prototype scale, revisit before v1. |
 | traceability | Covered | Correlation IDs per request; release records pin commit/digest/approver; template provenance recorded. |
 | transparency | Covered | Open error mapping, honest docs, public review findings; unified error envelope is Phase 2. |

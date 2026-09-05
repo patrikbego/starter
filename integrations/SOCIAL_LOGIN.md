@@ -1,8 +1,10 @@
 # Social Login (Google / Apple) — Runbook
 
-**Status: ✅ implemented — web scope (2026-09-05).** Console: Google + Apple enabled, Apple
-key/Services ID configured (see §2). Code: Google + Apple web popup sign-in implemented (see
-[Code checklist — web-first](#code-checklist--web-first-scope-google--apple-on-web-only)).
+**Status: ✅ implemented — web scope (2026-09-05).** Code: Google + Apple web popup sign-in
+implemented (see [Code checklist — web-first](#code-checklist--web-first-scope-google--apple-on-web-only)).
+Console: providers + Apple credential are wired for the template's own DEV project, but every
+product app redoes the console setup itself (see §2 — that is the per-app work, not a shared
+resource).
 Backend needed **zero changes** (see [The model](#the-model)). Native Google/Apple is the
 follow-up (see [native checklist](#code-checklist--native-later-scope-a-full)) — remember
 **Sign in with Apple is mandatory on iOS once Google ships on native** (Guideline 4.8).
@@ -138,7 +140,7 @@ client-supplied nonce is only required on native). `expo-auth-session` /
 | 1 | [`src/ports/AuthPort.ts`](../starter-mobile/src/ports/AuthPort.ts) | Added `signInWithGoogle(): Promise<void>` + `signInWithApple(): Promise<void>` |
 | 2 | [`src/adapters/FirebaseAuthAdapter.ts`](../starter-mobile/src/adapters/FirebaseAuthAdapter.ts) | Web branch: `signInWithPopup(auth, new GoogleAuthProvider())` / `signInWithPopup(auth, new OAuthProvider('apple.com'))`; **native throws "web-only at v1"** (the popup APIs are web-only in the JS SDK) |
 | 3 | [`src/features/auth/AuthProvider.tsx`](../starter-mobile/src/features/auth/AuthProvider.tsx) | Both methods exposed on the context value via `useCallback` |
-| 4 | [`app/(auth)/login.tsx`](../starter-mobile/app/(auth)/login.tsx) | "Continue with Google" / "Continue with Apple" buttons below a divider — **rendered only when `Platform.OS === 'web'`**; shared `socialSubmitting` state + `getAuthErrorMessage` |
+| 4 | [`app/(auth)/login.tsx`](<../starter-mobile/app/(auth)/login.tsx>) | "Continue with Google" / "Continue with Apple" buttons below a divider — **rendered only when `Platform.OS === 'web'`**; shared `socialSubmitting` state + `getAuthErrorMessage` |
 | 5 | [`src/features/auth/authErrors.ts`](../starter-mobile/src/features/auth/authErrors.ts) | Added popup codes: `popup-blocked`, `popup-closed-by-user`, `account-exists-with-different-credential`, `cancelled-popup-request`, `timeout` |
 
 Verified: `npx tsc --noEmit` clean (my files), `npm run lint` 0 errors, full jest suite

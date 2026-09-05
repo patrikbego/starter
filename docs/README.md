@@ -11,10 +11,11 @@ These documents coordinate the backend and mobile templates while they are devel
 | [REPOSITORY_STRATEGY.md](./REPOSITORY_STRATEGY.md) | Why there are two repositories and how they evolve safely |
 | [ENVIRONMENT_MATRIX.md](./ENVIRONMENT_MATRIX.md) | Local, DEV, and PROD configuration across both repositories |
 | [IMPLEMENTATION_ROADMAP.md](./IMPLEMENTATION_ROADMAP.md) | Ordered path from the current prototype to template v1 |
+| [integrations-plan.md](./integrations-plan.md) | Integration status/priority register (done, missing, cost, Spring coverage) |
 | [NEW_APP_WORKFLOW.md](./NEW_APP_WORKFLOW.md) | How to create a product from tagged template releases |
 | [UPSTREAM_SYNC.md](./UPSTREAM_SYNC.md) | How starter improvements flow into derived app repositories (remotes, merge runbook, divergence budget) |
 
-Integration runbooks (one doc per external service — Firebase, OpenRouter, Stripe, Resend, Slack, browser E2E) live in [integrations/README.md](../integrations/README.md).
+Integration runbooks — one doc per external service (Firebase Auth, OpenRouter, Stripe billing, Resend email, push, App Check, Sentry, PostHog, hosting, social login, media upload, background jobs, Slack alerts, browser E2E, search, sign-up abuse gate) — live in [integrations/README.md](../integrations/README.md), with statuses and priorities in [integrations-plan.md](./integrations-plan.md).
 
 Repository-owned documentation:
 
