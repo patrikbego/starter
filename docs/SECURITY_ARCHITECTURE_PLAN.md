@@ -84,6 +84,11 @@ Decisions that shape everything else:
   pending console registration + EAS live smoke. Enforcement off by default, PROD-on after a
   live smoke.
 - **Firebase Hosting** web app + CORS origin + security headers on the served app.
+  Web app and CORS origin: **implemented** ([FIREBASE_HOSTING.md](../integrations/FIREBASE_HOSTING.md)).
+  Security headers: **implemented 2026-09-05** in `starter-mobile/firebase.json` `headers`
+  (CSP, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`,
+  cached-asset `Cache-Control`); HSTS is served by Firebase Hosting itself. Verified in the
+  hosting emulator; live on the site from the next deploy.
 - **Budget/spend alerts applied**: the budget resources (50/90/100% + forecast, Pub/Sub + optional email) are written in `infra/main.tf` but only materialize once `billing_account_id` is set in the tfvars and `terraform apply` runs against the live billing account; automating the stop actions (Pub/Sub → Cloud Function) is also Phase 5/6.
 - **Sign-up abuse gate**: phased A→C→B per [integrations/SIGNUP_ABUSE_GATE.md](../integrations/SIGNUP_ABUSE_GATE.md) — Phase A (App Check enforcement on Identity Platform) is console-only with native App Check now wired; Phase C (reCAPTCHA assessment on Spring-mediated sign-up) is **implemented end-to-end for web** (backend route + gate default-off + web client adoption; native deliberately stays client-direct under Phase A); Phase B (blocking functions) is evidence-triggered. Full plan verified against live Firebase/Google docs; the old "blocking functions + reCAPTCHA" single-mechanism reading was wrong — a `beforeUserCreated` event carries no reCAPTCHA token channel.
 - **Deploying the Firestore rules** to the DEV/PROD projects.
@@ -145,10 +150,17 @@ Legend: ✅ baseline already in code · 🟡 partial, finish it · ⬜ new work
 
 ### 5. Expo Web hosting + transport hardening
 
-- ⬜ Host the Expo web build on **Firebase Hosting** (free tier, global CDN, custom domain, SSL). Route non-AI endpoints through Hosting rewrites → Cloud Run.
-- ⬜ **Keep `/ai/chat` calling Cloud Run directly** (Hosting → Cloud Run rewrites have a 60 s timeout; AI generation + streaming exceeds it).
-- 🟡 CORS already fail-closed per profile; add the Hosting domain to prod `STARTER_CORS_ALLOWED_ORIGINS` (no wildcard).
-- ⬜ Web security headers: CSP, HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` on the web app.
+- ✅ Host the Expo web build on **Firebase Hosting** (free tier, global CDN, custom domain,
+  SSL). Route non-AI endpoints through Hosting rewrites → Cloud Run. (Deployed @
+  https://starter-demo-dev.web.app; the Cloud Run rewrite half is not used — the client calls
+  the API directly, see the CORS row.)
+- ✅ **Keep `/ai/chat` calling Cloud Run directly** (Hosting → Cloud Run rewrites have a 60 s
+  timeout; AI generation + streaming exceeds it). No rewrite used, so satisfied by construction.
+- 🟡 CORS already fail-closed per profile; add the Hosting domain to prod `STARTER_CORS_ALLOWED_ORIGINS` (no wildcard). DEV done; PROD pending the PROD hosting site.
+- ✅ Web security headers: CSP, HSTS, `X-Content-Type-Options`, `Referrer-Policy`,
+  `Permissions-Policy` on the web app. (`firebase.json` `headers`; CSP covers the current
+  export — inline styles only, `script-src 'self'`; enabling web App Check or PostHog on the
+  hosted site requires extending the CSP — see [FIREBASE_HOSTING.md](../integrations/FIREBASE_HOSTING.md).)
 - ✅ Firebase web config is public-by-design (identifier, not credential); no backend keys ever enter the client.
 
 ### 6. Sign-up abuse gate (makes per-uid quotas meaningful)

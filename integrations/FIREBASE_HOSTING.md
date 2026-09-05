@@ -1,9 +1,9 @@
 # Firebase Hosting — Permanent Web URL (DEV)
 
-**Status: ✅ implemented 2026-09-04.** The Expo web export (`dist/`) deploys to Firebase
-Hosting on every `main` push — **gated on the browser e2e suite passing** (fail closed; the
-site only goes live when e2e is green against the exact exported bundle). This is the answer to
-"where's the frontend link?":
+**Status: ✅ implemented 2026-09-04 (security headers 2026-09-05).** The Expo web export
+(`dist/`) deploys to Firebase Hosting on every `main` push — **gated on the browser e2e suite
+passing** (fail closed; the site only goes live when e2e is green against the exact exported
+bundle). This is the answer to "where's the frontend link?":
 [`https://starter-demo-dev.web.app`](https://starter-demo-dev.web.app).
 
 ## Try it — live DEV app (links + credentials)
@@ -45,6 +45,35 @@ password: StarterDemo!2026
 
 Both bake the same DEV env at export time (`APP_ENV=development`, `API_BASE_URL_DEV`,
 `EXPO_PUBLIC_FIREBASE_*` from repo variables).
+
+## Security headers
+
+`firebase.json` `headers` ships a CSP + hardening on every served resource (verified locally in
+the hosting emulator; live on the site from the next deploy).
+
+| Header | Value / intent |
+|---|---|
+| Content-Security-Policy | `default-src 'self'`; `script-src 'self'`; `style-src 'self' 'unsafe-inline'` (Expo/RN-web inline styles); `connect-src` = Firebase Auth (`identitytoolkit.googleapis.com`, `securetoken.googleapis.com`, `www.googleapis.com`) + App Check token exchange (`content-firebaseappcheck.googleapis.com`) + the DEV API origin; `frame-src 'none'`; `frame-ancestors 'none'`; `upgrade-insecure-requests` |
+| X-Content-Type-Options | `nosniff` |
+| X-Frame-Options | `DENY` |
+| Referrer-Policy | `strict-origin-when-cross-origin` |
+| Permissions-Policy | `camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()` |
+| Cache-Control | catch-all `no-cache, no-store, must-revalidate` (shell, SPA routes, everything) · `/_expo/**` overrides to `public, max-age=31536000, immutable` (content-hashed bundles) |
+
+- **HSTS is already served by Firebase Hosting itself** (`max-age=31556926; includeSubDomains;
+  preload` — verified on the live site). No config needed; re-verify on the PROD site.
+- **Non-negotiable `style-src 'unsafe-inline'`**: the Expo export inlines two `<style>` tags and
+  RN-web sets inline style attributes. There are **no inline scripts** in the export, so
+  `script-src` stays `'self'`.
+- **Flip a toggle, update the CSP, redeploy**: enabling web App Check means adding reCAPTCHA
+  Enterprise origins (`https://www.google.com` + `https://www.gstatic.com` to `script-src`
+  /`frame-src`/`connect-src`, and dropping `frame-src 'none'`); enabling PostHog on the hosted
+  site means adding its host to `connect-src` (defaults to `https://eu.i.posthog.com`);
+  a PROD hosting site must swap the `connect-src` API origin to the PROD `run.app` URL.
+- **Rollback**: delete the `headers` block from `firebase.json` and redeploy.
+- **Live smoke** after the next deploy: `curl -sI https://starter-demo-dev.web.app/ | grep -i
+  'content-security-policy'` and grep the other headers; then open the site and sign in
+  (catches a CSP that is too strict before your users do).
 
 ## Files
 
